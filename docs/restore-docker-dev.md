@@ -21,9 +21,9 @@ Restore one or more archived sites into the local Docker dev stack and make them
 
 The currently supported site names are:
 
-- `nathabee_wordpress`
+- `demo_fullstack`
 - `orthopedagogie`
-- `orthopedagogiedutregor`
+- `demo_fullstack`
 
 ## Before you start
 
@@ -40,25 +40,25 @@ Use this when you want a clean rebuild of the whole Docker dev setup.
 
 ```bash
 # if env already installed
-cd ~/coding/project/docker/test-nathabee-world
+cd ~/coding/project/docker/test-nathabee-lab
 docker compose --env-file docker/.env.dev -f docker/compose.yaml down --volumes --rmi local
 cd ..
-rm -rf test-nathabee-world
+rm -rf test-nathabee-lab
 
 cd ~/coding/project/docker
-git clone git@github.com:nathabee/nathabee-world.git test-nathabee-world
-cd test-nathabee-world
+git clone git@github.com:nathabee/nathabee-lab.git test-nathabee-lab
+cd test-nathabee-lab
 
 ./scripts/fetch-release.sh --recent
 # EXAMPLE:
-# Repository: nathabee/nathabee-world
+# Repository: nathabee/nathabee-lab
 # Latest matching release tags:
 #
 # published_at           environment              stamp              tag
 # ---------------------- ------------------------ ------------------ ----------------------------------------------
-# 2026-03-15T14:27:58Z   orthopedagogiedutregor   20260315-141901    data-orthopedagogiedutregor-20260315-141901
+# 2026-03-15T14:27:58Z   demo_fullstack   20260315-141901    data-demo_fullstack-20260315-141901
 # 2026-03-15T14:27:36Z   orthopedagogie           20260315-141901    data-orthopedagogie-20260315-141901
-# 2026-03-15T14:27:04Z   nathabee_wordpress       20260315-141901    data-nathabee_wordpress-20260315-141901
+# 2026-03-15T14:27:04Z   demo_fullstack       20260315-141901    data-demo_fullstack-20260315-141901
 
 # fetch one full batch by timestamp
 ./scripts/fetch-release.sh <timestamp>
@@ -78,17 +78,17 @@ docker compose --env-file docker/.env.dev -f docker/compose.yaml config >/dev/nu
 
 ./docker/scripts/up.sh dev
 
-./docker/scripts/restore-site.sh dev nathabee_wordpress
-./docker/scripts/fix-urls.sh dev nathabee_wordpress
-./docker/scripts/reset-admin-password.sh dev nathabee_wordpress nathabee
+./docker/scripts/restore-site.sh dev demo_fullstack
+./docker/scripts/fix-urls.sh dev demo_fullstack
+./docker/scripts/reset-admin-password.sh dev demo_fullstack nathabee
 
 ./docker/scripts/restore-site.sh dev orthopedagogie
 ./docker/scripts/fix-urls.sh dev orthopedagogie
 ./docker/scripts/reset-admin-password.sh dev orthopedagogie nathabee
 
-./docker/scripts/restore-site.sh dev orthopedagogiedutregor
-./docker/scripts/fix-urls.sh dev orthopedagogiedutregor
-./docker/scripts/reset-admin-password.sh dev orthopedagogiedutregor nathabee
+./docker/scripts/restore-site.sh dev demo_fullstack
+./docker/scripts/fix-urls.sh dev demo_fullstack
+./docker/scripts/reset-admin-password.sh dev demo_fullstack nathabee
 ````
 
 ## Full restore into dev with one batch command
@@ -96,20 +96,20 @@ docker compose --env-file docker/.env.dev -f docker/compose.yaml config >/dev/nu
 If you want to restore all three sites in one pass, you can use:
 
 ```bash
-cd ~/coding/project/docker/test-nathabee-world
+cd ~/coding/project/docker/test-nathabee-lab
 
 ./docker/scripts/restore-all.sh dev
 
 ./docker/scripts/fix-urls.sh dev orthopedagogie
-./docker/scripts/fix-urls.sh dev orthopedagogiedutregor
+./docker/scripts/fix-urls.sh dev demo_fullstack
 ```
 
 Then reset passwords as needed:
 
 ```bash
-./docker/scripts/reset-admin-password.sh dev nathabee_wordpress nathabee
+./docker/scripts/reset-admin-password.sh dev demo_fullstack nathabee
 ./docker/scripts/reset-admin-password.sh dev orthopedagogie nathabee
-./docker/scripts/reset-admin-password.sh dev orthopedagogiedutregor nathabee
+./docker/scripts/reset-admin-password.sh dev demo_fullstack nathabee
 ```
 
 ## Refresh only one site in dev
@@ -121,7 +121,7 @@ This works for both bind-mount mode and named-volume mode.
 ### Example: refresh `orthopedagogie`
 
 ```bash
-cd ~/coding/project/docker/test-nathabee-world
+cd ~/coding/project/docker/test-nathabee-lab
 
 docker compose --env-file docker/.env.dev -f docker/compose.yaml config >/dev/null
 
@@ -135,35 +135,35 @@ chmod +x docker/scripts/*.sh
 ./docker/scripts/reset-admin-password.sh dev orthopedagogie nathabee
 ```
 
-### Example: refresh `nathabee_wordpress`
+### Example: refresh `demo_fullstack`
 
 ```bash
-cd ~/coding/project/docker/test-nathabee-world
+cd ~/coding/project/docker/test-nathabee-lab
 
 docker compose --env-file docker/.env.dev -f docker/compose.yaml config >/dev/null
 
-./scripts/fetch-release.sh <timestamp> nathabee_wordpress
+./scripts/fetch-release.sh <timestamp> demo_fullstack
 
 chmod +x docker/scripts/*.sh
 
-./docker/scripts/restore-site.sh dev nathabee_wordpress
-./docker/scripts/reset-admin-password.sh dev nathabee_wordpress nathabee
+./docker/scripts/restore-site.sh dev demo_fullstack
+./docker/scripts/reset-admin-password.sh dev demo_fullstack nathabee
 ```
 
-### Example: refresh `orthopedagogiedutregor`
+### Example: refresh `demo_fullstack`
 
 ```bash
-cd ~/coding/project/docker/test-nathabee-world
+cd ~/coding/project/docker/test-nathabee-lab
 
 docker compose --env-file docker/.env.dev -f docker/compose.yaml config >/dev/null
 
-./scripts/fetch-release.sh <timestamp> orthopedagogiedutregor
+./scripts/fetch-release.sh <timestamp> demo_fullstack
 
 chmod +x docker/scripts/*.sh
 
-./docker/scripts/restore-site.sh dev orthopedagogiedutregor
-./docker/scripts/fix-urls.sh dev orthopedagogiedutregor
-./docker/scripts/reset-admin-password.sh dev orthopedagogiedutregor nathabee
+./docker/scripts/restore-site.sh dev demo_fullstack
+./docker/scripts/fix-urls.sh dev demo_fullstack
+./docker/scripts/reset-admin-password.sh dev demo_fullstack nathabee
 ```
 
 ## Why no manual deletion of `docker/runtime/` or Docker volumes is needed
@@ -188,9 +188,9 @@ That keeps the same workflow valid for both bind mounts and named volumes.
 
 After restore:
 
-* `nathabee_wordpress` normally does **not** need `fix-urls.sh`
+* `demo_fullstack` normally does **not** need `fix-urls.sh`
 * `orthopedagogie` should run `fix-urls.sh`
-* `orthopedagogiedutregor` should run `fix-urls.sh`
+* `demo_fullstack` should run `fix-urls.sh`
 
 Reason: the two sub-sites often still contain old path-based URLs inside content or metadata.
 
@@ -209,20 +209,20 @@ Expected result is an HTTP response from each local site.
 Use WP-CLI to inspect existing users before resetting passwords if you are not sure which login exists.
 
 ```bash
-docker compose --profile cli --env-file docker/.env.dev -f docker/compose.yaml run --rm --no-deps wpcli_nathabee_wordpress \
+docker compose --profile cli --env-file docker/.env.dev -f docker/compose.yaml run --rm --no-deps wpcli_demo_fullstack \
   wp --allow-root user list --fields=ID,user_login,user_email,roles
 
 docker compose --profile cli --env-file docker/.env.dev -f docker/compose.yaml run --rm --no-deps wpcli_orthopedagogie \
   wp --allow-root user list --fields=ID,user_login,user_email,roles
 
-docker compose --profile cli --env-file docker/.env.dev -f docker/compose.yaml run --rm --no-deps wpcli_orthopedagogiedutregor \
+docker compose --profile cli --env-file docker/.env.dev -f docker/compose.yaml run --rm --no-deps wpcli_demo_fullstack \
   wp --allow-root user list --fields=ID,user_login,user_email,roles
 ```
 
 ## Stop the dev environment
 
 ```bash
-cd ~/coding/project/docker/test-nathabee-world
+cd ~/coding/project/docker/test-nathabee-lab
 docker compose --env-file docker/.env.dev -f docker/compose.yaml down
 ```
 
@@ -231,10 +231,10 @@ docker compose --env-file docker/.env.dev -f docker/compose.yaml down
 Use this only when you want to completely remove the local Docker dev environment and start again from zero.
 
 ```bash
-cd ~/coding/project/docker/test-nathabee-world
+cd ~/coding/project/docker/test-nathabee-lab
 docker compose --env-file docker/.env.dev -f docker/compose.yaml down --volumes --rmi local
 cd ..
-rm -rf test-nathabee-world
+rm -rf test-nathabee-lab
 ```
 
 ## Notes

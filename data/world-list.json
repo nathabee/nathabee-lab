@@ -1,63 +1,59 @@
 {
   "projects": [
     {
-      "projectname": "nathabee_wordpress",
+      "projectname": "demo_wordpress",
       "projecttype": "wordpress",
       "active": true,
-      "description": "Main site",
-      "datecreation": "2026-03-16",
+      "description": "Demo WordPress",
+      "datecreation": "2026-03-18",
       "storage_mode": "bind",
       "compose": {
-        "db_service": "db_nathabee_wordpress",
-        "wp_service": "wp_nathabee_wordpress",
-        "wpcli_service": "wpcli_nathabee_wordpress",
-        "db_host_runtime": "db_nathabee_wordpress:3306"
+        "db_service": "db_demo_wordpress",
+        "wp_service": "wp_demo_wordpress",
+        "wpcli_service": "wpcli_demo_wordpress",
+        "db_host_runtime": "db_demo_wordpress:3306"
       },
       "env": {
-        "db_name": "NW_DB_NAME",
-        "db_user": "NW_DB_USER",
-        "db_password": "NW_DB_PASSWORD",
-        "site_url": "NW_SITE_URL"
+        "port": "DEMOWP_PORT",
+        "site_url": "DEMOWP_SITE_URL",
+        "db_name": "DEMOWP_DB_NAME",
+        "db_user": "DEMOWP_DB_USER",
+        "db_password": "DEMOWP_DB_PASSWORD",
+        "db_root_password": "DEMOWP_DB_ROOT_PASSWORD",
+        "wp_files_mount": "DEMOWP_WP_FILES_MOUNT"
       }
     },
     {
-      "projectname": "orthopedagogie",
-      "projecttype": "wordpress",
+      "projectname": "demo_fullstack",
+      "projecttype": "fullstack",
       "active": true,
-      "description": "Orthopedagogie site",
-      "datecreation": "2026-03-16",
-      "storage_mode": "bind",
-      "compose": {
-        "db_service": "db_orthopedagogie",
-        "wp_service": "wp_orthopedagogie",
-        "wpcli_service": "wpcli_orthopedagogie",
-        "db_host_runtime": "db_orthopedagogie:3306"
-      },
-      "env": {
-        "db_name": "ORTHO_DB_NAME",
-        "db_user": "ORTHO_DB_USER",
-        "db_password": "ORTHO_DB_PASSWORD",
-        "site_url": "ORTHO_SITE_URL"
-      }
-    },
-    {
-      "projectname": "orthopedagogiedutregor",
-      "projecttype": "wordpress",
-      "active": true,
-      "description": "Tregor site",
-      "datecreation": "2026-03-16",
+      "description": "Demo fullstack project",
+      "datecreation": "2026-03-18",
       "storage_mode": "volume",
       "compose": {
-        "db_service": "db_orthopedagogiedutregor",
-        "wp_service": "wp_orthopedagogiedutregor",
-        "wpcli_service": "wpcli_orthopedagogiedutregor",
-        "db_host_runtime": "db_orthopedagogiedutregor:3306"
+        "db_service": "db_demo_fullstack",
+        "wp_service": "wp_demo_fullstack",
+        "wpcli_service": "wpcli_demo_fullstack",
+        "db_host_runtime": "db_demo_fullstack:3306",
+        "app_db_service": "appdb_demo_fullstack",
+        "app_service": "app_demo_fullstack",
+        "app_db_host_runtime": "appdb_demo_fullstack:5432"
       },
       "env": {
-        "db_name": "TREGOR_DB_NAME",
-        "db_user": "TREGOR_DB_USER",
-        "db_password": "TREGOR_DB_PASSWORD",
-        "site_url": "TREGOR_SITE_URL"
+        "wp_port": "DEMOFS_WP_PORT",
+        "site_url": "DEMOFS_SITE_URL",
+        "db_name": "DEMOFS_DB_NAME",
+        "db_user": "DEMOFS_DB_USER",
+        "db_password": "DEMOFS_DB_PASSWORD",
+        "db_root_password": "DEMOFS_DB_ROOT_PASSWORD",
+        "wp_files_mount": "DEMOFS_WP_FILES_MOUNT",
+        "app_port": "DEMOFS_APP_PORT",
+        "app_code_mount": "DEMOFS_APP_CODE_MOUNT",
+        "app_db_name": "DEMOFS_APP_DB_NAME",
+        "app_db_user": "DEMOFS_APP_DB_USER",
+        "app_db_password": "DEMOFS_APP_DB_PASSWORD",
+        "django_settings_module": "DEMOFS_DJANGO_SETTINGS_MODULE",
+        "django_secret_key": "DEMOFS_DJANGO_SECRET_KEY"
       }
     }
   ]

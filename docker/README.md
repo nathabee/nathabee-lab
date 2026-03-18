@@ -66,9 +66,9 @@ chmod 600 docker/.env.dev docker/.env.prod
 Examples:
 
 ```bash
-./docker/scripts/restore-site.sh dev nathabee_wordpress
+./docker/scripts/restore-site.sh dev demo_fullstack
 ./docker/scripts/restore-site.sh dev orthopedagogie
-./docker/scripts/restore-site.sh dev orthopedagogiedutregor
+./docker/scripts/restore-site.sh dev demo_fullstack
 ```
 
 ## Restore all sites
@@ -100,7 +100,7 @@ If only `.sql.gz` exists, the restore script should support importing it directl
 If not, recreate the raw SQL first:
 
 ```bash
-gunzip -k data/nathabee_wordpress/database/nathabee_wordpress.sql.gz
+gunzip -k data/demo_fullstack/database/demo_fullstack.sql.gz
 ```
 
 ## Runtime data

@@ -35,9 +35,9 @@ These scripts are the Docker-native counterpart of the legacy host export script
 
 The currently supported archive names are:
 
-* `nathabee_wordpress`
+* `demo_fullstack`
 * `orthopedagogie`
-* `orthopedagogiedutregor`
+* `demo_fullstack`
 
 ## Docker storage modes
 
@@ -51,7 +51,7 @@ Example:
 
 ```yaml
 volumes:
-  - wp_nathabee_wordpress_data:/var/www/html
+  - wp_demo_fullstack_data:/var/www/html
 ```
 
 In this mode, WordPress files live inside Docker-managed storage and are not directly exposed as normal host files.
@@ -64,7 +64,7 @@ Example:
 
 ```yaml
 volumes:
-  - ./runtime/nathabee_wordpress/wp:/var/www/html
+  - ./runtime/demo_fullstack/wp:/var/www/html
 ```
 
 In this mode, WordPress files are visible directly on the host filesystem.
@@ -121,17 +121,17 @@ From the project root:
 ```bash
 source docker/scripts/alias.sh dev
 
-nwexportsite nathabee_wordpress
+nwexportsite demo_fullstack
 nwexportsite orthopedagogie
-nwexportsite orthopedagogiedutregor
+nwexportsite demo_fullstack
 ```
 
 Or with dedicated export scripts:
 
 ```bash
-./docker/scripts/export-site.sh dev nathabee_wordpress
+./docker/scripts/export-site.sh dev demo_fullstack
 ./docker/scripts/export-site.sh dev orthopedagogie
-./docker/scripts/export-site.sh dev orthopedagogiedutregor
+./docker/scripts/export-site.sh dev demo_fullstack
 ```
 
 Then package and publish:

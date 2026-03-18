@@ -6,7 +6,7 @@
 
 ```bash
 # with nathabee user
-cd ~/nathabee-world
+cd ~/nathabee-lab
 # update /data with all 3 wordpress datas and db
 ./scripts/updateAllArchive.sh
 # send in github

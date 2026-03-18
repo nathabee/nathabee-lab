@@ -1,0 +1,122 @@
+services:
+  db_demo_fullstack:
+    image: ${MARIADB_IMAGE}
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DEMOFS_DB_ROOT_PASSWORD}
+      MARIADB_ROOT_HOST: localhost
+      MARIADB_DATABASE: ${DEMOFS_DB_NAME}
+      MARIADB_USER: ${DEMOFS_DB_USER}
+      MARIADB_PASSWORD: ${DEMOFS_DB_PASSWORD}
+      MARIADB_AUTO_UPGRADE: "1"
+    volumes:
+      - db_demo_fullstack:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -p$$MARIADB_ROOT_PASSWORD || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - net_demo_fullstack
+    security_opt:
+      - no-new-privileges:true
+
+  wp_demo_fullstack:
+    image: ${WORDPRESS_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      db_demo_fullstack:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${DEMOFS_WP_PORT}:80"
+    environment:
+      WORDPRESS_DB_HOST: db_demo_fullstack:3306
+      WORDPRESS_DB_USER: ${DEMOFS_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${DEMOFS_DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${DEMOFS_DB_NAME}
+      WORDPRESS_DEBUG: ${WP_DEBUG}
+      WORDPRESS_CONFIG_EXTRA: |
+        define('FS_METHOD', 'direct');
+    volumes:
+      - ${DEMOFS_WP_FILES_MOUNT}
+    networks:
+      - net_demo_fullstack
+    security_opt:
+      - no-new-privileges:true
+
+  wpcli_demo_fullstack:
+    image: ${WORDPRESS_CLI_IMAGE}
+    profiles: ["cli"]
+    depends_on:
+      db_demo_fullstack:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: db_demo_fullstack:3306
+      WORDPRESS_DB_USER: ${DEMOFS_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${DEMOFS_DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${DEMOFS_DB_NAME}
+      WORDPRESS_CONFIG_EXTRA: |
+        define('FS_METHOD', 'direct');
+    volumes:
+      - ${DEMOFS_WP_FILES_MOUNT}
+    working_dir: /var/www/html
+    networks:
+      - net_demo_fullstack
+
+  appdb_demo_fullstack:
+    image: ${POSTGRES_IMAGE}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DEMOFS_APP_DB_NAME}
+      POSTGRES_USER: ${DEMOFS_APP_DB_USER}
+      POSTGRES_PASSWORD: ${DEMOFS_APP_DB_PASSWORD}
+    volumes:
+      - appdb_demo_fullstack:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - net_demo_fullstack
+    security_opt:
+      - no-new-privileges:true
+
+  app_demo_fullstack:
+    image: ${PYTHON_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      appdb_demo_fullstack:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${DEMOFS_APP_PORT}:8000"
+    working_dir: /app
+    command: >
+      sh -lc "python manage.py runserver 0.0.0.0:8000"
+    environment:
+      DJANGO_SETTINGS_MODULE: ${DEMOFS_DJANGO_SETTINGS_MODULE}
+      DJANGO_SECRET_KEY: ${DEMOFS_DJANGO_SECRET_KEY}
+      DATABASE_HOST: appdb_demo_fullstack
+      DATABASE_PORT: 5432
+      DATABASE_NAME: ${DEMOFS_APP_DB_NAME}
+      DATABASE_USER: ${DEMOFS_APP_DB_USER}
+      DATABASE_PASSWORD: ${DEMOFS_APP_DB_PASSWORD}
+    volumes:
+      - ${DEMOFS_APP_CODE_MOUNT}
+    networks:
+      - net_demo_fullstack
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  db_demo_fullstack:
+  wp_demo_fullstack_data:
+  appdb_demo_fullstack:
+
+networks:
+  net_demo_fullstack:

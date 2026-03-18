@@ -4,7 +4,7 @@ set -euo pipefail
 
 ENV_NAME="${1:-}"
 
-ALLOWED_ENVS=("nathabee_wordpress" "orthopedagogie" "orthopedagogiedutregor")
+ALLOWED_ENVS=("demo_fullstack" "orthopedagogie" "demo_fullstack")
 
 if [[ -z "${ENV_NAME}" ]]; then
   echo "Usage: $0 <environment_name>"

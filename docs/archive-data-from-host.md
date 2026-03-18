@@ -37,9 +37,9 @@ Host export uses:
 
 The currently supported archive names are:
 
-* `nathabee_wordpress`
+* `demo_fullstack`
 * `orthopedagogie`
-* `orthopedagogiedutregor`
+* `demo_fullstack`
 
 ## `scripts/updateArchive.sh`
 

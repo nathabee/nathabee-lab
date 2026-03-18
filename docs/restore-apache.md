@@ -6,19 +6,19 @@
 
 - `https://nathabee.de/` -> `127.0.0.1:18081`
 - `https://orthopedagogie.nathabee.de/` -> `127.0.0.1:18082`
-- `https://orthopedagogiedutregor.nathabee.de/` -> `127.0.0.1:18083`
+- `https://demo_fullstack.nathabee.de/` -> `127.0.0.1:18083`
 
 ## DNS in Hetzner
 
 ### IPv4
 - `A  @                      -> VPS_IPV4`
 - `A  orthopedagogie         -> VPS_IPV4`
-- `A  orthopedagogiedutregor -> VPS_IPV4`
+- `A  demo_fullstack -> VPS_IPV4`
 
 ### IPv6
 - `AAAA  @                      -> VPS_IPV6`
 - `AAAA  orthopedagogie         -> VPS_IPV6`
-- `AAAA  orthopedagogiedutregor -> VPS_IPV6`
+- `AAAA  demo_fullstack -> VPS_IPV6`
 
 ## Hetzner Cloud Firewall
 
@@ -40,7 +40,7 @@
 
 ```bash
 # check if .env is correct, normally this step is done during docker install
-cd ~/nathabee-world-prod
+cd ~/nathabee-lab
 cp docker/env.prod.example docker/.env.prod
 nano docker/.env.prod
 ````
@@ -77,7 +77,7 @@ sudo chown -R www-data:www-data /var/www/certbot
 sudo tee /etc/apache2/sites-available/00-acme-redirects.conf >/dev/null <<'APACHE'
 <VirtualHost *:80>
     ServerName nathabee.de
-    ServerAlias orthopedagogie.nathabee.de orthopedagogiedutregor.nathabee.de
+    ServerAlias orthopedagogie.nathabee.de demo_fullstack.nathabee.de
 
     Alias /.well-known/acme-challenge/ /var/www/certbot/.well-known/acme-challenge/
     <Directory "/var/www/certbot/.well-known/acme-challenge/">
@@ -107,7 +107,7 @@ sudo systemctl reload apache2
 ```bash
 sudo certbot certonly --webroot -w /var/www/certbot -d nathabee.de -m admin@nathabee.de --agree-tos --no-eff-email
 sudo certbot certonly --webroot -w /var/www/certbot -d orthopedagogie.nathabee.de -m admin@nathabee.de --agree-tos --no-eff-email
-sudo certbot certonly --webroot -w /var/www/certbot -d orthopedagogiedutregor.nathabee.de -m admin@nathabee.de --agree-tos --no-eff-email
+sudo certbot certonly --webroot -w /var/www/certbot -d demo_fullstack.nathabee.de -m admin@nathabee.de --agree-tos --no-eff-email
 ```
 
 ## apache ssl vhosts
@@ -165,13 +165,13 @@ APACHE
 ```
 
 ```bash
-sudo tee /etc/apache2/sites-available/orthopedagogiedutregor-ssl.conf >/dev/null <<'APACHE'
+sudo tee /etc/apache2/sites-available/demo_fullstack-ssl.conf >/dev/null <<'APACHE'
 <VirtualHost *:443>
-    ServerName orthopedagogiedutregor.nathabee.de
+    ServerName demo_fullstack.nathabee.de
 
     SSLEngine on
-    SSLCertificateFile /etc/letsencrypt/live/orthopedagogiedutregor.nathabee.de/fullchain.pem
-    SSLCertificateKeyFile /etc/letsencrypt/live/orthopedagogiedutregor.nathabee.de/privkey.pem
+    SSLCertificateFile /etc/letsencrypt/live/demo_fullstack.nathabee.de/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/demo_fullstack.nathabee.de/privkey.pem
     Include /etc/letsencrypt/options-ssl-apache.conf
 
     ProxyPreserveHost On
@@ -184,8 +184,8 @@ sudo tee /etc/apache2/sites-available/orthopedagogiedutregor-ssl.conf >/dev/null
     Header always set X-Content-Type-Options "nosniff"
     Header always set X-Frame-Options "SAMEORIGIN"
 
-    ErrorLog  ${APACHE_LOG_DIR}/orthopedagogiedutregor-ssl-error.log
-    CustomLog ${APACHE_LOG_DIR}/orthopedagogiedutregor-ssl-access.log combined
+    ErrorLog  ${APACHE_LOG_DIR}/demo_fullstack-ssl-error.log
+    CustomLog ${APACHE_LOG_DIR}/demo_fullstack-ssl-access.log combined
 </VirtualHost>
 APACHE
 ```
@@ -199,7 +199,7 @@ sudo a2dissite default-ssl.conf 2>/dev/null || true
 sudo a2ensite 00-acme-redirects.conf
 sudo a2ensite nathabee-ssl.conf
 sudo a2ensite orthopedagogie-ssl.conf
-sudo a2ensite orthopedagogiedutregor-ssl.conf
+sudo a2ensite demo_fullstack-ssl.conf
 
 sudo apache2ctl configtest
 sudo systemctl reload apache2
@@ -221,7 +221,7 @@ sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-apache.sh
 ```bash
 curl -I https://nathabee.de/
 curl -I https://orthopedagogie.nathabee.de/
-curl -I https://orthopedagogiedutregor.nathabee.de/
+curl -I https://demo_fullstack.nathabee.de/
 ```
 
 ```bash
@@ -233,7 +233,7 @@ sudo systemctl status apache2 --no-pager
 sudo tail -n 100 /var/log/apache2/http-error.log
 sudo tail -n 100 /var/log/apache2/nathabee-ssl-error.log
 sudo tail -n 100 /var/log/apache2/orthopedagogie-ssl-error.log
-sudo tail -n 100 /var/log/apache2/orthopedagogiedutregor-ssl-error.log
+sudo tail -n 100 /var/log/apache2/demo_fullstack-ssl-error.log
 ```
 
 

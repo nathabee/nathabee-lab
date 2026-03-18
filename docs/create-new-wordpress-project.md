@@ -1,6 +1,6 @@
 # Create a New Docker WordPress Project
 
-This document explains how to create a new empty WordPress project in the `nathabee-world` Docker architecture.
+This document explains how to create a new empty WordPress project in the `nathabee-lab` Docker architecture.
 
 A new project is created in two phases:
 
@@ -11,6 +11,7 @@ This separation is intentional:
 
 - `create-project.sh` prepares the project definition and Docker structure
 - `bootstrap-wordpress.sh` installs WordPress into that new project
+- `bootstrap-django.sh` installs django into that new project
 
 ## Preconditions
 
@@ -28,43 +29,95 @@ cp docker/env.dev.example docker/.env.dev
 cp docker/env.prod.example docker/.env.prod
 chmod 600 docker/.env.dev docker/.env.prod
 chmod +x docker/scripts/*.sh
-````
+```
 
-## Example
+## Example of a "Wordpress" project creation
 
-Create a new project named `beeschool`:
-
+Create a new project named `demo_wordpress`:
+ 
 ```bash
 ./docker/scripts/create-project.sh \
-  --name beeschool \
-  --description "Bee School WordPress" \
-  --code BEESCHOOL \
+  --type wordpress \
+  --name demo_wordpress \
+  --description "Demo WordPress" \
+  --code DEMOWP \
   --storage bind \
-  --dev-port 8084 \
-  --prod-port 18084 \
-  --dev-url http://localhost:8084/ \
-  --prod-url https://beeschool.nathabee.de/
-```
-Check :
-docker compose --profile cli --env-file docker/.env.dev -f docker/compose.yaml config --services
+  --dev-port 8081 \
+  --prod-port 18081 \
+  --dev-url http://localhost:8081/ \
+  --prod-url https://demo-wordpress.example.test/
 
+
+docker compose --profile cli --env-file docker/.env.dev -f docker/compose.yaml config --services
+``` 
+
+check the env (prod dev  ), data/world-list.json and new site/*/compose.yaml
 
 Then bootstrap WordPress in the dev environment:
 
 ```bash
 ./docker/scripts/bootstrap-wordpress.sh \
-  dev beeschool \
-  --title "Bee School" \
-  --admin-user nathabee \
+  dev demo_wordpress \
+  --title "Demo WordPress" \
+  --admin-user beelab \
   --admin-email you@example.com \
-  --table-prefix beeschool_
+  --table-prefix demowp_
 ```
-Note the password of administrator admin-user , in the example user nathabee
+Note the password of administrator admin-user , in the example user beelab
 Check :
 http://localhost:8084/ 
 in prod create apache configuration
 
 
+
+## Example of a "fullstack" project creation
+
+ 
+
+Create a new project named `demo_fullstack`:
+ 
+```bash
+./docker/scripts/create-project.sh \
+  --type fullstack \
+  --name demo_fullstack \
+  --description "Demo fullstack project" \
+  --code DEMOFS \
+  --storage volume \
+  --dev-port 8083 \
+  --prod-port 18083 \
+  --app-dev-port 8093 \
+  --app-prod-port 18093 \
+  --dev-url http://localhost:8083/ \
+  --prod-url https://demo-fullstack.example.test/
+
+
+docker compose --profile cli --env-file docker/.env.dev -f docker/compose.yaml config --services
+
+``` 
+
+check the env (prod dev  ), data/world-list.json and new site/*/compose.yaml
+
+Then bootstrap WordPress in the dev environment:
+
+
+```bash
+./docker/scripts/bootstrap-wordpress.sh \
+  dev demo_fullstack \
+  --title "Demo Fullstack WordPress" \
+  --admin-user beelab \
+  --admin-email you@example.com \
+  --table-prefix demofs_
+```
+
+Then bootstrap Django in the dev environment:
+```bash
+./docker/scripts/bootstrap-django.sh \
+....to be defined script does not exist 
+```
+Note the password of administrator admin-user , in the example user beelab
+Check :
+http://localhost:8084/ 
+in prod create apache configuration
 
 
 ## What `create-project.sh` does

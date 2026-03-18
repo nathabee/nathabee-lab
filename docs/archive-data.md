@@ -31,18 +31,18 @@ Typical structure:
 ```text
 data/
 ├── .gitkeep
-├── nathabee_wordpress/
+├── demo_fullstack/
 ├── orthopedagogie/
-└── orthopedagogiedutregor/
+└── demo_fullstack/
 ````
 
 ## Supported archive names
 
 The currently supported site archive names are:
 
-* `nathabee_wordpress`
+* `demo_fullstack`
 * `orthopedagogie`
-* `orthopedagogiedutregor`
+* `demo_fullstack`
 
 ## Archive structure
 
@@ -138,9 +138,9 @@ Example:
 
 This typically creates up to three release tags:
 
-* `data-nathabee_wordpress-YYYYMMDD-HHMMSS`
+* `data-demo_fullstack-YYYYMMDD-HHMMSS`
 * `data-orthopedagogie-YYYYMMDD-HHMMSS`
-* `data-orthopedagogiedutregor-YYYYMMDD-HHMMSS`
+* `data-demo_fullstack-YYYYMMDD-HHMMSS`
 
 ## Fetch workflow
 

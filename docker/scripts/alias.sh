@@ -7,7 +7,7 @@
 #   source docker/scripts/alias.sh dev
 #   source docker/scripts/alias.sh dev orthopedagogie
 #   nwenv prod
-#   nwsite orthopedagogiedutregor
+#   nwsite demo_fullstack
 #   nwup
 #   nwwpls
 #   nwwp option get home
@@ -19,9 +19,9 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   exit 1
 fi
 
-_NW_ROOT="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-_NW_STACK_DIR="${_NW_ROOT}/docker"
-_NW_WORLD_FILE="${_NW_ROOT}/data/world-list.json"
+_DEMOWP_ROOT="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+_DEMOWP_STACK_DIR="${_DEMOWP_ROOT}/docker"
+_DEMOWP_WORLD_FILE="${_DEMOWP_ROOT}/data/world-list.json"
 
 _nw_validate_env() {
   case "${1:-}" in
@@ -54,7 +54,7 @@ _nw_get_sites() {
     (.projects // .)[]
     | select((.projecttype // .type // "") == "wordpress")
     | (.projectname // .name // empty)
-  ' "${_NW_WORLD_FILE}"
+  ' "${_DEMOWP_WORLD_FILE}"
 }
 
 _nw_get_active_sites() {
@@ -63,7 +63,7 @@ _nw_get_active_sites() {
     | select((.projecttype // .type // "") == "wordpress")
     | select((.active // false) == true)
     | (.projectname // .name // empty)
-  ' "${_NW_WORLD_FILE}"
+  ' "${_DEMOWP_WORLD_FILE}"
 }
 
 _nw_default_site() {
@@ -80,7 +80,7 @@ _nw_default_site() {
     return 0
   fi
 
-  echo "No wordpress projects found in ${_NW_WORLD_FILE}" >&2
+  echo "No wordpress projects found in ${_DEMOWP_WORLD_FILE}" >&2
   return 1
 }
 
@@ -96,7 +96,7 @@ _nw_validate_site() {
     (.projects // .)[]
     | select((.projecttype // .type // "") == "wordpress")
     | select((.projectname // .name) == $site)
-  ' "${_NW_WORLD_FILE}" >/dev/null 2>&1; then
+  ' "${_DEMOWP_WORLD_FILE}" >/dev/null 2>&1; then
     return 0
   fi
 
@@ -112,7 +112,7 @@ _nw_get_project_json() {
     (.projects // .)[]
     | select((.projecttype // .type // "") == "wordpress")
     | select((.projectname // .name) == $site)
-  ' "${_NW_WORLD_FILE}"
+  ' "${_DEMOWP_WORLD_FILE}"
 }
 
 _nw_read_compose_project_name() {
@@ -138,16 +138,16 @@ _nw_set_env() {
 
   _nw_require_cmd jq || return 1
   _nw_validate_env "${env}" || return 1
-  _nw_require_file "${_NW_WORLD_FILE}" || return 1
+  _nw_require_file "${_DEMOWP_WORLD_FILE}" || return 1
 
-  export NW_ENV="${env}"
-  export NW_ENV_FILE="${_NW_STACK_DIR}/.env.${env}"
-  export NW_COMPOSE_FILE="${_NW_STACK_DIR}/compose.yaml"
+  export DEMOWP_ENV="${env}"
+  export DEMOWP_ENV_FILE="${_DEMOWP_STACK_DIR}/.env.${env}"
+  export DEMOWP_COMPOSE_FILE="${_DEMOWP_STACK_DIR}/compose.yaml"
 
-  _nw_require_file "${NW_ENV_FILE}" || return 1
-  _nw_require_file "${NW_COMPOSE_FILE}" || return 1
+  _nw_require_file "${DEMOWP_ENV_FILE}" || return 1
+  _nw_require_file "${DEMOWP_COMPOSE_FILE}" || return 1
 
-  export NW_COMPOSE_PROJECT_NAME="$(_nw_read_compose_project_name "${NW_ENV_FILE}")"
+  export DEMOWP_COMPOSE_PROJECT_NAME="$(_nw_read_compose_project_name "${DEMOWP_ENV_FILE}")"
 }
 
 _nw_set_site() {
@@ -162,17 +162,17 @@ _nw_set_site() {
   local project_json
   project_json="$(_nw_get_project_json "${site}")" || return 1
 
-  export NW_SITE="${site}"
-  export NW_WP_SERVICE
-  export NW_WPCLI_SERVICE
-  export NW_DB_SERVICE
+  export DEMOWP_SITE="${site}"
+  export DEMOWP_WP_SERVICE
+  export DEMOWP_WPCLI_SERVICE
+  export DEMOWP_DB_SERVICE
 
-  NW_WP_SERVICE="$(jq -r '.compose.wp_service // empty' <<< "${project_json}")"
-  NW_WPCLI_SERVICE="$(jq -r '.compose.wpcli_service // empty' <<< "${project_json}")"
-  NW_DB_SERVICE="$(jq -r '.compose.db_service // empty' <<< "${project_json}")"
+  DEMOWP_WP_SERVICE="$(jq -r '.compose.wp_service // empty' <<< "${project_json}")"
+  DEMOWP_WPCLI_SERVICE="$(jq -r '.compose.wpcli_service // empty' <<< "${project_json}")"
+  DEMOWP_DB_SERVICE="$(jq -r '.compose.db_service // empty' <<< "${project_json}")"
 
-  if [[ -z "${NW_WP_SERVICE}" || -z "${NW_WPCLI_SERVICE}" || -z "${NW_DB_SERVICE}" ]]; then
-    echo "Project ${site} is missing compose service mapping in ${_NW_WORLD_FILE}"
+  if [[ -z "${DEMOWP_WP_SERVICE}" || -z "${DEMOWP_WPCLI_SERVICE}" || -z "${DEMOWP_DB_SERVICE}" ]]; then
+    echo "Project ${site} is missing compose service mapping in ${_DEMOWP_WORLD_FILE}"
     return 1
   fi
 }
@@ -182,31 +182,31 @@ _nw_set_site "${2:-}" || return 1
 
 nwenv() {
   _nw_set_env "${1:-dev}" || return 1
-  echo "nathabee-world env -> ${NW_ENV}"
+  echo "nathabee-lab env -> ${DEMOWP_ENV}"
 }
 
 nwsite() {
   _nw_set_site "${1:-}" || return 1
-  echo "nathabee-world site -> ${NW_SITE}"
+  echo "nathabee-lab site -> ${DEMOWP_SITE}"
 }
 
 nwdc() {
   (
-    cd "${_NW_ROOT}" && \
+    cd "${_DEMOWP_ROOT}" && \
     docker compose \
-      --env-file "${NW_ENV_FILE}" \
-      -f "${NW_COMPOSE_FILE}" \
+      --env-file "${DEMOWP_ENV_FILE}" \
+      -f "${DEMOWP_COMPOSE_FILE}" \
       "$@"
   )
 }
 
 nwdccli() {
   (
-    cd "${_NW_ROOT}" && \
+    cd "${_DEMOWP_ROOT}" && \
     docker compose \
       --profile cli \
-      --env-file "${NW_ENV_FILE}" \
-      -f "${NW_COMPOSE_FILE}" \
+      --env-file "${DEMOWP_ENV_FILE}" \
+      -f "${DEMOWP_COMPOSE_FILE}" \
       "$@"
   )
 }
@@ -268,15 +268,15 @@ _nw_cli_run() {
 }
 
 nwwpexec() {
-  _nw_exec "${NW_WP_SERVICE}" "$@"
+  _nw_exec "${DEMOWP_WP_SERVICE}" "$@"
 }
 
 nwwpcliexec() {
-  _nw_cli_run "${NW_WPCLI_SERVICE}" "$@"
+  _nw_cli_run "${DEMOWP_WPCLI_SERVICE}" "$@"
 }
 
 nwdbexec() {
-  _nw_exec "${NW_DB_SERVICE}" "$@"
+  _nw_exec "${DEMOWP_DB_SERVICE}" "$@"
 }
 
 nwwpls() {
@@ -346,8 +346,8 @@ nwdbtables() {
 }
 
 nwvolumes() {
-  if [[ -n "${NW_COMPOSE_PROJECT_NAME:-}" ]]; then
-    docker volume ls | grep -F "${NW_COMPOSE_PROJECT_NAME}" || true
+  if [[ -n "${DEMOWP_COMPOSE_PROJECT_NAME:-}" ]]; then
+    docker volume ls | grep -F "${DEMOWP_COMPOSE_PROJECT_NAME}" || true
   else
     docker volume ls
   fi
@@ -363,7 +363,7 @@ nwinspectvolume() {
 }
 
 nwexportfiles() {
-  local site="${1:-${NW_SITE}}"
+  local site="${1:-${DEMOWP_SITE}}"
   _nw_validate_site "${site}" || return 1
 
   local service
@@ -372,10 +372,10 @@ nwexportfiles() {
 
   project_json="$(_nw_get_project_json "${site}")" || return 1
   service="$(jq -r '.compose.wp_service // empty' <<< "${project_json}")"
-  dest="${2:-${_NW_ROOT}/data/${site}/wpfile}"
+  dest="${2:-${_DEMOWP_ROOT}/data/${site}/wpfile}"
 
   if [[ -z "${service}" ]]; then
-    echo "Project ${site} is missing .compose.wp_service in ${_NW_WORLD_FILE}"
+    echo "Project ${site} is missing .compose.wp_service in ${_DEMOWP_WORLD_FILE}"
     return 1
   fi
 
@@ -392,7 +392,7 @@ nwexportfiles() {
 }
 
 nwexportdb() {
-  local site="${1:-${NW_SITE}}"
+  local site="${1:-${DEMOWP_SITE}}"
   _nw_validate_site "${site}" || return 1
 
   local service
@@ -402,11 +402,11 @@ nwexportdb() {
 
   project_json="$(_nw_get_project_json "${site}")" || return 1
   service="$(jq -r '.compose.wpcli_service // empty' <<< "${project_json}")"
-  out_dir="${_NW_ROOT}/data/${site}/database"
+  out_dir="${_DEMOWP_ROOT}/data/${site}/database"
   out_file="${2:-${out_dir}/${site}.sql.gz}"
 
   if [[ -z "${service}" ]]; then
-    echo "Project ${site} is missing .compose.wpcli_service in ${_NW_WORLD_FILE}"
+    echo "Project ${site} is missing .compose.wpcli_service in ${_DEMOWP_WORLD_FILE}"
     return 1
   fi
 
@@ -426,22 +426,22 @@ nwexportdb() {
 }
 
 nwexportsite() {
-  local site="${1:-${NW_SITE}}"
+  local site="${1:-${DEMOWP_SITE}}"
   _nw_validate_site "${site}" || return 1
-  "${_NW_STACK_DIR}/scripts/export-site.sh" "${NW_ENV}" "${site}"
+  "${_DEMOWP_STACK_DIR}/scripts/export-site.sh" "${DEMOWP_ENV}" "${site}"
 }
 
 nwbasicauthset() {
-  local site="${1:-${NW_SITE}}"
+  local site="${1:-${DEMOWP_SITE}}"
   local user="${2:-}"
 
   _nw_validate_site "${site}" || return 1
-  "${_NW_STACK_DIR}/scripts/set-basic-auth.sh" "${NW_ENV}" "${site}" "${user}"
+  "${_DEMOWP_STACK_DIR}/scripts/set-basic-auth.sh" "${DEMOWP_ENV}" "${site}" "${user}"
 }
 
 nwhelp() {
   cat <<EOF
-nathabee-world aliases
+nathabee-lab aliases
 
 Environment and site
   nwenv dev|prod
@@ -492,8 +492,8 @@ $(_nw_get_sites | sed 's/^/  - /')
 EOF
 }
 
-echo "nathabee-world aliases loaded -> env=${NW_ENV} site=${NW_SITE}"
-if [[ -n "${NW_COMPOSE_PROJECT_NAME:-}" ]]; then
-  echo "Compose project -> ${NW_COMPOSE_PROJECT_NAME}"
+echo "nathabee-lab aliases loaded -> env=${DEMOWP_ENV} site=${DEMOWP_SITE}"
+if [[ -n "${DEMOWP_COMPOSE_PROJECT_NAME:-}" ]]; then
+  echo "Compose project -> ${DEMOWP_COMPOSE_PROJECT_NAME}"
 fi
 echo "Use nwhelp to list commands."

@@ -5,6 +5,7 @@ usage() {
   cat <<'EOF'
 Usage:
   ./docker/scripts/create-project.sh \
+    --type wordpress|fullstack \
     --name PROJECT_NAME \
     --description "Human description" \
     --code ENV_CODE \
@@ -16,26 +17,40 @@ Usage:
     [--db-name DB_NAME] \
     [--db-user DB_USER] \
     [--bind-path ./runtime/PROJECT_NAME] \
-    [--active true|false]
+    [--active true|false] \
+    [--app-dev-port 8094] \
+    [--app-prod-port 18094] \
+    [--app-db-name APP_DB_NAME] \
+    [--app-db-user APP_DB_USER] \
+    [--app-bind-path ./runtime/PROJECT_NAME_app]
 
 Examples:
-  ./docker/scripts/create-project.sh \
-    --name beeschool \
-    --description "Bee School WordPress" \
-    --code BEESCHOOL \
-    --storage bind \
-    --dev-port 8084 \
-    --prod-port 18084 \
-    --dev-url http://localhost:8084/ \
-    --prod-url https://beeschool.nathabee.de/
 
-  ./docker/scripts/create-project.sh \
-    --name myclient \
-    --description "Client site" \
-    --code MYCLIENT \
-    --storage volume \
-    --dev-port 8085 \
-    --prod-port 18085
+  WordPress:
+    ./docker/scripts/create-project.sh \
+      --type wordpress \
+      --name demo_wordpress \
+      --description "Demo WordPress" \
+      --code DEMOWP \
+      --storage bind \
+      --dev-port 8081 \
+      --prod-port 18081 \
+      --dev-url http://localhost:8081/ \
+      --prod-url https://demo-wordpress.example.test/
+
+  Fullstack:
+    ./docker/scripts/create-project.sh \
+      --type fullstack \
+      --name demo_fullstack \
+      --description "Demo fullstack project" \
+      --code DEMOFS \
+      --storage volume \
+      --dev-port 8083 \
+      --prod-port 18083 \
+      --app-dev-port 8093 \
+      --app-prod-port 18093 \
+      --dev-url http://localhost:8083/ \
+      --prod-url https://demo-fullstack.example.test/
 EOF
 }
 
@@ -67,6 +82,352 @@ append_env_block_if_missing() {
   } >> "${file}"
 }
 
+write_root_compose_include_if_missing() {
+  if [[ ! -f "${ROOT_COMPOSE_FILE}" ]]; then
+    cat > "${ROOT_COMPOSE_FILE}" <<EOF
+include:
+  - path: ./sites/${NAME}/compose.yaml
+    project_directory: .
+EOF
+    return 0
+  fi
+
+  if ! grep -Fq "./sites/${NAME}/compose.yaml" "${ROOT_COMPOSE_FILE}"; then
+    cat >> "${ROOT_COMPOSE_FILE}" <<EOF
+  - path: ./sites/${NAME}/compose.yaml
+    project_directory: .
+EOF
+  fi
+}
+
+write_wordpress_compose() {
+  local wp_volume_block=""
+
+  if [[ "${STORAGE}" == "volume" ]]; then
+    wp_volume_block="  ${WP_VOLUME}:"
+  fi
+
+  cat > "${SITE_COMPOSE_FILE}" <<EOF
+services:
+  ${DB_SERVICE}:
+    image: \${MARIADB_IMAGE}
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MARIADB_ROOT_PASSWORD: \${${DB_ROOT_PASSWORD_KEY}}
+      MARIADB_ROOT_HOST: localhost
+      MARIADB_DATABASE: \${${DB_NAME_KEY}}
+      MARIADB_USER: \${${DB_USER_KEY}}
+      MARIADB_PASSWORD: \${${DB_PASSWORD_KEY}}
+      MARIADB_AUTO_UPGRADE: "1"
+    volumes:
+      - ${DB_VOLUME}:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -p\$\$MARIADB_ROOT_PASSWORD || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - ${NETWORK_NAME}
+    security_opt:
+      - no-new-privileges:true
+
+  ${WP_SERVICE}:
+    image: \${WORDPRESS_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      ${DB_SERVICE}:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:\${${PORT_KEY}}:80"
+    environment:
+      WORDPRESS_DB_HOST: ${DB_SERVICE}:3306
+      WORDPRESS_DB_USER: \${${DB_USER_KEY}}
+      WORDPRESS_DB_PASSWORD: \${${DB_PASSWORD_KEY}}
+      WORDPRESS_DB_NAME: \${${DB_NAME_KEY}}
+      WORDPRESS_DEBUG: \${WP_DEBUG}
+      WORDPRESS_CONFIG_EXTRA: |
+        define('FS_METHOD', 'direct');
+    volumes:
+      - \${${WP_FILES_MOUNT_KEY}}
+    networks:
+      - ${NETWORK_NAME}
+    security_opt:
+      - no-new-privileges:true
+
+  ${WPCLI_SERVICE}:
+    image: \${WORDPRESS_CLI_IMAGE}
+    profiles: ["cli"]
+    depends_on:
+      ${DB_SERVICE}:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: ${DB_SERVICE}:3306
+      WORDPRESS_DB_USER: \${${DB_USER_KEY}}
+      WORDPRESS_DB_PASSWORD: \${${DB_PASSWORD_KEY}}
+      WORDPRESS_DB_NAME: \${${DB_NAME_KEY}}
+      WORDPRESS_CONFIG_EXTRA: |
+        define('FS_METHOD', 'direct');
+    volumes:
+      - \${${WP_FILES_MOUNT_KEY}}
+    working_dir: /var/www/html
+    networks:
+      - ${NETWORK_NAME}
+
+volumes:
+  ${DB_VOLUME}:
+${wp_volume_block}
+
+networks:
+  ${NETWORK_NAME}:
+EOF
+}
+
+write_fullstack_compose() {
+  local wp_volume_block=""
+
+  if [[ "${STORAGE}" == "volume" ]]; then
+    wp_volume_block="  ${WP_VOLUME}:"
+  fi
+
+  cat > "${SITE_COMPOSE_FILE}" <<EOF
+services:
+  ${DB_SERVICE}:
+    image: \${MARIADB_IMAGE}
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MARIADB_ROOT_PASSWORD: \${${DB_ROOT_PASSWORD_KEY}}
+      MARIADB_ROOT_HOST: localhost
+      MARIADB_DATABASE: \${${DB_NAME_KEY}}
+      MARIADB_USER: \${${DB_USER_KEY}}
+      MARIADB_PASSWORD: \${${DB_PASSWORD_KEY}}
+      MARIADB_AUTO_UPGRADE: "1"
+    volumes:
+      - ${DB_VOLUME}:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -p\$\$MARIADB_ROOT_PASSWORD || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - ${NETWORK_NAME}
+    security_opt:
+      - no-new-privileges:true
+
+  ${WP_SERVICE}:
+    image: \${WORDPRESS_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      ${DB_SERVICE}:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:\${${WP_PORT_KEY}}:80"
+    environment:
+      WORDPRESS_DB_HOST: ${DB_SERVICE}:3306
+      WORDPRESS_DB_USER: \${${DB_USER_KEY}}
+      WORDPRESS_DB_PASSWORD: \${${DB_PASSWORD_KEY}}
+      WORDPRESS_DB_NAME: \${${DB_NAME_KEY}}
+      WORDPRESS_DEBUG: \${WP_DEBUG}
+      WORDPRESS_CONFIG_EXTRA: |
+        define('FS_METHOD', 'direct');
+    volumes:
+      - \${${WP_FILES_MOUNT_KEY}}
+    networks:
+      - ${NETWORK_NAME}
+    security_opt:
+      - no-new-privileges:true
+
+  ${WPCLI_SERVICE}:
+    image: \${WORDPRESS_CLI_IMAGE}
+    profiles: ["cli"]
+    depends_on:
+      ${DB_SERVICE}:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: ${DB_SERVICE}:3306
+      WORDPRESS_DB_USER: \${${DB_USER_KEY}}
+      WORDPRESS_DB_PASSWORD: \${${DB_PASSWORD_KEY}}
+      WORDPRESS_DB_NAME: \${${DB_NAME_KEY}}
+      WORDPRESS_CONFIG_EXTRA: |
+        define('FS_METHOD', 'direct');
+    volumes:
+      - \${${WP_FILES_MOUNT_KEY}}
+    working_dir: /var/www/html
+    networks:
+      - ${NETWORK_NAME}
+
+  ${APP_DB_SERVICE}:
+    image: \${POSTGRES_IMAGE}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: \${${APP_DB_NAME_KEY}}
+      POSTGRES_USER: \${${APP_DB_USER_KEY}}
+      POSTGRES_PASSWORD: \${${APP_DB_PASSWORD_KEY}}
+    volumes:
+      - ${APP_DB_VOLUME}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \$\$POSTGRES_USER -d \$\$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - ${NETWORK_NAME}
+    security_opt:
+      - no-new-privileges:true
+
+  ${APP_SERVICE}:
+    image: \${PYTHON_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      ${APP_DB_SERVICE}:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:\${${APP_PORT_KEY}}:8000"
+    working_dir: /app
+    command: >
+      sh -lc "python manage.py runserver 0.0.0.0:8000"
+    environment:
+      DJANGO_SETTINGS_MODULE: \${${DJANGO_SETTINGS_MODULE_KEY}}
+      DJANGO_SECRET_KEY: \${${DJANGO_SECRET_KEY_KEY}}
+      DATABASE_HOST: ${APP_DB_SERVICE}
+      DATABASE_PORT: 5432
+      DATABASE_NAME: \${${APP_DB_NAME_KEY}}
+      DATABASE_USER: \${${APP_DB_USER_KEY}}
+      DATABASE_PASSWORD: \${${APP_DB_PASSWORD_KEY}}
+    volumes:
+      - \${${APP_CODE_MOUNT_KEY}}
+    networks:
+      - ${NETWORK_NAME}
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  ${DB_VOLUME}:
+${wp_volume_block}
+  ${APP_DB_VOLUME}:
+
+networks:
+  ${NETWORK_NAME}:
+EOF
+}
+
+build_wordpress_project_json() {
+  jq -n \
+    --arg projectname "${NAME}" \
+    --arg projecttype "${TYPE}" \
+    --argjson active "${ACTIVE}" \
+    --arg description "${DESCRIPTION}" \
+    --arg datecreation "$(date +%Y-%m-%d)" \
+    --arg storage_mode "${STORAGE}" \
+    --arg db_service "${DB_SERVICE}" \
+    --arg wp_service "${WP_SERVICE}" \
+    --arg wpcli_service "${WPCLI_SERVICE}" \
+    --arg db_host_runtime "${DB_HOST_RUNTIME}" \
+    --arg port_key "${PORT_KEY}" \
+    --arg site_url_key "${SITE_URL_KEY}" \
+    --arg db_name_key "${DB_NAME_KEY}" \
+    --arg db_user_key "${DB_USER_KEY}" \
+    --arg db_password_key "${DB_PASSWORD_KEY}" \
+    --arg db_root_password_key "${DB_ROOT_PASSWORD_KEY}" \
+    --arg wp_files_mount_key "${WP_FILES_MOUNT_KEY}" \
+    '{
+      projectname: $projectname,
+      projecttype: $projecttype,
+      active: $active,
+      description: $description,
+      datecreation: $datecreation,
+      storage_mode: $storage_mode,
+      compose: {
+        db_service: $db_service,
+        wp_service: $wp_service,
+        wpcli_service: $wpcli_service,
+        db_host_runtime: $db_host_runtime
+      },
+      env: {
+        port: $port_key,
+        site_url: $site_url_key,
+        db_name: $db_name_key,
+        db_user: $db_user_key,
+        db_password: $db_password_key,
+        db_root_password: $db_root_password_key,
+        wp_files_mount: $wp_files_mount_key
+      }
+    }'
+}
+
+build_fullstack_project_json() {
+  jq -n \
+    --arg projectname "${NAME}" \
+    --arg projecttype "${TYPE}" \
+    --argjson active "${ACTIVE}" \
+    --arg description "${DESCRIPTION}" \
+    --arg datecreation "$(date +%Y-%m-%d)" \
+    --arg storage_mode "${STORAGE}" \
+    --arg db_service "${DB_SERVICE}" \
+    --arg wp_service "${WP_SERVICE}" \
+    --arg wpcli_service "${WPCLI_SERVICE}" \
+    --arg db_host_runtime "${DB_HOST_RUNTIME}" \
+    --arg app_db_service "${APP_DB_SERVICE}" \
+    --arg app_service "${APP_SERVICE}" \
+    --arg app_db_host_runtime "${APP_DB_HOST_RUNTIME}" \
+    --arg wp_port_key "${WP_PORT_KEY}" \
+    --arg site_url_key "${SITE_URL_KEY}" \
+    --arg db_name_key "${DB_NAME_KEY}" \
+    --arg db_user_key "${DB_USER_KEY}" \
+    --arg db_password_key "${DB_PASSWORD_KEY}" \
+    --arg db_root_password_key "${DB_ROOT_PASSWORD_KEY}" \
+    --arg wp_files_mount_key "${WP_FILES_MOUNT_KEY}" \
+    --arg app_port_key "${APP_PORT_KEY}" \
+    --arg app_code_mount_key "${APP_CODE_MOUNT_KEY}" \
+    --arg app_db_name_key "${APP_DB_NAME_KEY}" \
+    --arg app_db_user_key "${APP_DB_USER_KEY}" \
+    --arg app_db_password_key "${APP_DB_PASSWORD_KEY}" \
+    --arg django_settings_module_key "${DJANGO_SETTINGS_MODULE_KEY}" \
+    --arg django_secret_key_key "${DJANGO_SECRET_KEY_KEY}" \
+    '{
+      projectname: $projectname,
+      projecttype: $projecttype,
+      active: $active,
+      description: $description,
+      datecreation: $datecreation,
+      storage_mode: $storage_mode,
+      compose: {
+        db_service: $db_service,
+        wp_service: $wp_service,
+        wpcli_service: $wpcli_service,
+        db_host_runtime: $db_host_runtime,
+        app_db_service: $app_db_service,
+        app_service: $app_service,
+        app_db_host_runtime: $app_db_host_runtime
+      },
+      env: {
+        wp_port: $wp_port_key,
+        site_url: $site_url_key,
+        db_name: $db_name_key,
+        db_user: $db_user_key,
+        db_password: $db_password_key,
+        db_root_password: $db_root_password_key,
+        wp_files_mount: $wp_files_mount_key,
+        app_port: $app_port_key,
+        app_code_mount: $app_code_mount_key,
+        app_db_name: $app_db_name_key,
+        app_db_user: $app_db_user_key,
+        app_db_password: $app_db_password_key,
+        django_settings_module: $django_settings_module_key,
+        django_secret_key: $django_secret_key_key
+      }
+    }'
+}
+
+TYPE=""
 NAME=""
 DESCRIPTION=""
 CODE=""
@@ -80,8 +441,18 @@ DB_USER=""
 BIND_PATH=""
 ACTIVE="true"
 
+APP_DEV_PORT=""
+APP_PROD_PORT=""
+APP_DB_NAME=""
+APP_DB_USER=""
+APP_BIND_PATH=""
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --type)
+      TYPE="${2:-}"
+      shift 2
+      ;;
     --name)
       NAME="${2:-}"
       shift 2
@@ -130,6 +501,26 @@ while [[ $# -gt 0 ]]; do
       ACTIVE="${2:-}"
       shift 2
       ;;
+    --app-dev-port)
+      APP_DEV_PORT="${2:-}"
+      shift 2
+      ;;
+    --app-prod-port)
+      APP_PROD_PORT="${2:-}"
+      shift 2
+      ;;
+    --app-db-name)
+      APP_DB_NAME="${2:-}"
+      shift 2
+      ;;
+    --app-db-user)
+      APP_DB_USER="${2:-}"
+      shift 2
+      ;;
+    --app-bind-path)
+      APP_BIND_PATH="${2:-}"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -142,8 +533,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "${NAME}" || -z "${DESCRIPTION}" || -z "${CODE}" || -z "${STORAGE}" || -z "${DEV_PORT}" || -z "${PROD_PORT}" ]]; then
+if [[ -z "${TYPE}" || -z "${NAME}" || -z "${DESCRIPTION}" || -z "${CODE}" || -z "${STORAGE}" || -z "${DEV_PORT}" || -z "${PROD_PORT}" ]]; then
   usage
+  exit 1
+fi
+
+if [[ "${TYPE}" != "wordpress" && "${TYPE}" != "fullstack" ]]; then
+  echo "Invalid --type. Allowed: wordpress or fullstack."
   exit 1
 fi
 
@@ -172,6 +568,18 @@ if [[ ! "${DEV_PORT}" =~ ^[0-9]+$ || ! "${PROD_PORT}" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
+if [[ "${TYPE}" == "fullstack" ]]; then
+  if [[ -z "${APP_DEV_PORT}" || -z "${APP_PROD_PORT}" ]]; then
+    echo "Fullstack projects require --app-dev-port and --app-prod-port."
+    exit 1
+  fi
+
+  if [[ ! "${APP_DEV_PORT}" =~ ^[0-9]+$ || ! "${APP_PROD_PORT}" =~ ^[0-9]+$ ]]; then
+    echo "App ports must be numeric."
+    exit 1
+  fi
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOCKER_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${DOCKER_DIR}/.." && pwd)"
@@ -183,7 +591,9 @@ SITE_COMPOSE_FILE="${SITE_DIR}/compose.yaml"
 DATA_SITE_DIR="${REPO_ROOT}/data/${NAME}"
 DATA_DB_DIR="${DATA_SITE_DIR}/database"
 DATA_WP_DIR="${DATA_SITE_DIR}/wpfile"
+DATA_APP_DIR="${DATA_SITE_DIR}/app"
 RUNTIME_DIR="${DOCKER_DIR}/runtime/${NAME}"
+APP_RUNTIME_DIR="${DOCKER_DIR}/runtime/${NAME}_app"
 
 ENV_DEV_EXAMPLE="${DOCKER_DIR}/env.dev.example"
 ENV_PROD_EXAMPLE="${DOCKER_DIR}/env.prod.example"
@@ -191,7 +601,6 @@ ENV_DEV_LOCAL="${DOCKER_DIR}/.env.dev"
 ENV_PROD_LOCAL="${DOCKER_DIR}/.env.prod"
 
 require_cmd jq
-require_cmd python3
 
 if [[ ! -f "${WORLD_FILE}" ]]; then
   echo "Missing world list: ${WORLD_FILE}"
@@ -215,7 +624,7 @@ if jq -e --arg name "${NAME}" '
   exit 1
 fi
 
-if grep -q "^${CODE}_PORT=" "${ENV_DEV_EXAMPLE}" || grep -q "^${CODE}_PORT=" "${ENV_PROD_EXAMPLE}"; then
+if grep -Eq "^${CODE}_" "${ENV_DEV_EXAMPLE}" || grep -Eq "^${CODE}_" "${ENV_PROD_EXAMPLE}"; then
   echo "Env code already exists in env examples: ${CODE}"
   exit 1
 fi
@@ -253,7 +662,6 @@ NETWORK_NAME="net_${NAME}"
 DB_VOLUME="db_${NAME}"
 WP_VOLUME="wp_${NAME}_data"
 
-PORT_KEY="${CODE}_PORT"
 SITE_URL_KEY="${CODE}_SITE_URL"
 DB_NAME_KEY="${CODE}_DB_NAME"
 DB_USER_KEY="${CODE}_DB_USER"
@@ -266,6 +674,43 @@ DEV_DB_ROOT_PASSWORD="change_me_dev_${NAME}_root_password"
 PROD_DB_PASSWORD="change_me_prod_${NAME}_db_password"
 PROD_DB_ROOT_PASSWORD="change_me_prod_${NAME}_root_password"
 
+if [[ "${TYPE}" == "wordpress" ]]; then
+  PORT_KEY="${CODE}_PORT"
+else
+  WP_PORT_KEY="${CODE}_WP_PORT"
+  APP_PORT_KEY="${CODE}_APP_PORT"
+  APP_DB_SERVICE="appdb_${NAME}"
+  APP_SERVICE="app_${NAME}"
+  APP_DB_HOST_RUNTIME="${APP_DB_SERVICE}:5432"
+  APP_DB_VOLUME="appdb_${NAME}"
+
+  APP_DB_NAME_KEY="${CODE}_APP_DB_NAME"
+  APP_DB_USER_KEY="${CODE}_APP_DB_USER"
+  APP_DB_PASSWORD_KEY="${CODE}_APP_DB_PASSWORD"
+  APP_CODE_MOUNT_KEY="${CODE}_APP_CODE_MOUNT"
+  DJANGO_SETTINGS_MODULE_KEY="${CODE}_DJANGO_SETTINGS_MODULE"
+  DJANGO_SECRET_KEY_KEY="${CODE}_DJANGO_SECRET_KEY"
+
+  if [[ -z "${APP_DB_NAME}" ]]; then
+    APP_DB_NAME="${NAME}_app"
+  fi
+
+  if [[ -z "${APP_DB_USER}" ]]; then
+    APP_DB_USER="${NAME}_app_user"
+  fi
+
+  if [[ -z "${APP_BIND_PATH}" ]]; then
+    APP_BIND_PATH="./runtime/${NAME}_app"
+  fi
+
+  DEV_APP_DB_PASSWORD="change_me_dev_${NAME}_app_db_password"
+  PROD_APP_DB_PASSWORD="change_me_prod_${NAME}_app_db_password"
+  DEV_DJANGO_SETTINGS_MODULE="config.settings"
+  PROD_DJANGO_SETTINGS_MODULE="config.settings"
+  DEV_DJANGO_SECRET_KEY="change_me_dev_${NAME}_django_secret"
+  PROD_DJANGO_SECRET_KEY="change_me_prod_${NAME}_django_secret"
+fi
+
 if [[ "${STORAGE}" == "bind" ]]; then
   DEV_WP_MOUNT="${BIND_PATH}:/var/www/html"
   PROD_WP_MOUNT="${BIND_PATH}:/var/www/html"
@@ -277,227 +722,46 @@ fi
 mkdir -p "${SITE_DIR}"
 mkdir -p "${DATA_DB_DIR}" "${DATA_WP_DIR}"
 
+if [[ "${TYPE}" == "fullstack" ]]; then
+  mkdir -p "${DATA_APP_DIR}"
+fi
+
 if [[ "${STORAGE}" == "bind" ]]; then
   mkdir -p "${RUNTIME_DIR}"
 fi
 
-if [[ "${STORAGE}" == "bind" ]]; then
-  cat > "${SITE_COMPOSE_FILE}" <<EOF
-services:
-  ${DB_SERVICE}:
-    image: \${MARIADB_IMAGE}
-    restart: unless-stopped
-    command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_unicode_ci
-    environment:
-      MARIADB_ROOT_PASSWORD: \${${DB_ROOT_PASSWORD_KEY}}
-      MARIADB_ROOT_HOST: localhost
-      MARIADB_DATABASE: \${${DB_NAME_KEY}}
-      MARIADB_USER: \${${DB_USER_KEY}}
-      MARIADB_PASSWORD: \${${DB_PASSWORD_KEY}}
-      MARIADB_AUTO_UPGRADE: "1"
-    volumes:
-      - ${DB_VOLUME}:/var/lib/mysql
-    healthcheck:
-      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -p\$\$MARIADB_ROOT_PASSWORD || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
-    networks:
-      - ${NETWORK_NAME}
-    security_opt:
-      - no-new-privileges:true
-
-  ${WP_SERVICE}:
-    image: \${WORDPRESS_IMAGE}
-    restart: unless-stopped
-    depends_on:
-      ${DB_SERVICE}:
-        condition: service_healthy
-    ports:
-      - "127.0.0.1:\${${PORT_KEY}}:80"
-    environment:
-      WORDPRESS_DB_HOST: ${DB_SERVICE}:3306
-      WORDPRESS_DB_USER: \${${DB_USER_KEY}}
-      WORDPRESS_DB_PASSWORD: \${${DB_PASSWORD_KEY}}
-      WORDPRESS_DB_NAME: \${${DB_NAME_KEY}}
-      WORDPRESS_DEBUG: \${WP_DEBUG}
-      WORDPRESS_CONFIG_EXTRA: |
-        define('FS_METHOD', 'direct');
-    volumes:
-      - \${${WP_FILES_MOUNT_KEY}}
-    networks:
-      - ${NETWORK_NAME}
-    security_opt:
-      - no-new-privileges:true
-
-  ${WPCLI_SERVICE}:
-    image: \${WORDPRESS_CLI_IMAGE}
-    profiles: ["cli"]
-    depends_on:
-      ${DB_SERVICE}:
-        condition: service_healthy
-    environment:
-      WORDPRESS_DB_HOST: ${DB_SERVICE}:3306
-      WORDPRESS_DB_USER: \${${DB_USER_KEY}}
-      WORDPRESS_DB_PASSWORD: \${${DB_PASSWORD_KEY}}
-      WORDPRESS_DB_NAME: \${${DB_NAME_KEY}}
-      WORDPRESS_CONFIG_EXTRA: |
-        define('FS_METHOD', 'direct');
-    volumes:
-      - \${${WP_FILES_MOUNT_KEY}}
-    working_dir: /var/www/html
-    networks:
-      - ${NETWORK_NAME}
-
-volumes:
-  ${DB_VOLUME}:
-
-networks:
-  ${NETWORK_NAME}:
-EOF
-else
-  cat > "${SITE_COMPOSE_FILE}" <<EOF
-services:
-  ${DB_SERVICE}:
-    image: \${MARIADB_IMAGE}
-    restart: unless-stopped
-    command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_unicode_ci
-    environment:
-      MARIADB_ROOT_PASSWORD: \${${DB_ROOT_PASSWORD_KEY}}
-      MARIADB_ROOT_HOST: localhost
-      MARIADB_DATABASE: \${${DB_NAME_KEY}}
-      MARIADB_USER: \${${DB_USER_KEY}}
-      MARIADB_PASSWORD: \${${DB_PASSWORD_KEY}}
-      MARIADB_AUTO_UPGRADE: "1"
-    volumes:
-      - ${DB_VOLUME}:/var/lib/mysql
-    healthcheck:
-      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -p\$\$MARIADB_ROOT_PASSWORD || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
-    networks:
-      - ${NETWORK_NAME}
-    security_opt:
-      - no-new-privileges:true
-
-  ${WP_SERVICE}:
-    image: \${WORDPRESS_IMAGE}
-    restart: unless-stopped
-    depends_on:
-      ${DB_SERVICE}:
-        condition: service_healthy
-    ports:
-      - "127.0.0.1:\${${PORT_KEY}}:80"
-    environment:
-      WORDPRESS_DB_HOST: ${DB_SERVICE}:3306
-      WORDPRESS_DB_USER: \${${DB_USER_KEY}}
-      WORDPRESS_DB_PASSWORD: \${${DB_PASSWORD_KEY}}
-      WORDPRESS_DB_NAME: \${${DB_NAME_KEY}}
-      WORDPRESS_DEBUG: \${WP_DEBUG}
-      WORDPRESS_CONFIG_EXTRA: |
-        define('FS_METHOD', 'direct');
-    volumes:
-      - \${${WP_FILES_MOUNT_KEY}}
-    networks:
-      - ${NETWORK_NAME}
-    security_opt:
-      - no-new-privileges:true
-
-  ${WPCLI_SERVICE}:
-    image: \${WORDPRESS_CLI_IMAGE}
-    profiles: ["cli"]
-    depends_on:
-      ${DB_SERVICE}:
-        condition: service_healthy
-    environment:
-      WORDPRESS_DB_HOST: ${DB_SERVICE}:3306
-      WORDPRESS_DB_USER: \${${DB_USER_KEY}}
-      WORDPRESS_DB_PASSWORD: \${${DB_PASSWORD_KEY}}
-      WORDPRESS_DB_NAME: \${${DB_NAME_KEY}}
-      WORDPRESS_CONFIG_EXTRA: |
-        define('FS_METHOD', 'direct');
-    volumes:
-      - \${${WP_FILES_MOUNT_KEY}}
-    working_dir: /var/www/html
-    networks:
-      - ${NETWORK_NAME}
-
-volumes:
-  ${DB_VOLUME}:
-  ${WP_VOLUME}:
-
-networks:
-  ${NETWORK_NAME}:
-EOF
+if [[ "${TYPE}" == "fullstack" ]]; then
+  mkdir -p "${APP_RUNTIME_DIR}"
+  DEV_APP_CODE_MOUNT="${APP_BIND_PATH}:/app"
+  PROD_APP_CODE_MOUNT="${APP_BIND_PATH}:/app"
 fi
 
-if [[ ! -f "${ROOT_COMPOSE_FILE}" ]]; then
-  cat > "${ROOT_COMPOSE_FILE}" <<EOF
-include:
-  - path: ./sites/${NAME}/compose.yaml
-    project_directory: .
-EOF
+if [[ "${TYPE}" == "wordpress" ]]; then
+  write_wordpress_compose
 else
-  if ! grep -Fq "./sites/${NAME}/compose.yaml" "${ROOT_COMPOSE_FILE}"; then
-    cat >> "${ROOT_COMPOSE_FILE}" <<EOF
-  - path: ./sites/${NAME}/compose.yaml
-    project_directory: .
-EOF
-  fi
+  write_fullstack_compose
 fi
 
-NEW_PROJECT_JSON="$(
-  jq -n \
-    --arg projectname "${NAME}" \
-    --arg projecttype "wordpress" \
-    --argjson active "${ACTIVE}" \
-    --arg description "${DESCRIPTION}" \
-    --arg datecreation "$(date +%Y-%m-%d)" \
-    --arg storage_mode "${STORAGE}" \
-    --arg db_service "${DB_SERVICE}" \
-    --arg wp_service "${WP_SERVICE}" \
-    --arg wpcli_service "${WPCLI_SERVICE}" \
-    --arg db_host_runtime "${DB_HOST_RUNTIME}" \
-    --arg db_name_key "${DB_NAME_KEY}" \
-    --arg db_user_key "${DB_USER_KEY}" \
-    --arg db_password_key "${DB_PASSWORD_KEY}" \
-    --arg site_url_key "${SITE_URL_KEY}" \
-    '{
-      projectname: $projectname,
-      projecttype: $projecttype,
-      active: $active,
-      description: $description,
-      datecreation: $datecreation,
-      storage_mode: $storage_mode,
-      compose: {
-        db_service: $db_service,
-        wp_service: $wp_service,
-        wpcli_service: $wpcli_service,
-        db_host_runtime: $db_host_runtime
-      },
-      env: {
-        db_name: $db_name_key,
-        db_user: $db_user_key,
-        db_password: $db_password_key,
-        site_url: $site_url_key
-      }
-    }'
-)"
+write_root_compose_include_if_missing
+
+if [[ "${TYPE}" == "wordpress" ]]; then
+  NEW_PROJECT_JSON="$(build_wordpress_project_json)"
+else
+  NEW_PROJECT_JSON="$(build_fullstack_project_json)"
+fi
 
 TMP_WORLD="$(mktemp)"
 jq --argjson new_project "${NEW_PROJECT_JSON}" '
-  .projects += [$new_project]
+  if has("projects") then
+    .projects += [$new_project]
+  else
+    . + {projects: [$new_project]}
+  end
 ' "${WORLD_FILE}" > "${TMP_WORLD}"
 mv "${TMP_WORLD}" "${WORLD_FILE}"
 
-DEV_ENV_BLOCK="$(cat <<EOF
+if [[ "${TYPE}" == "wordpress" ]]; then
+  DEV_ENV_BLOCK="$(cat <<EOF
 ${PORT_KEY}=${DEV_PORT}
 ${SITE_URL_KEY}=${DEV_URL}
 ${DB_NAME_KEY}=${DB_NAME}
@@ -508,7 +772,7 @@ ${WP_FILES_MOUNT_KEY}=${DEV_WP_MOUNT}
 EOF
 )"
 
-PROD_ENV_BLOCK="$(cat <<EOF
+  PROD_ENV_BLOCK="$(cat <<EOF
 ${PORT_KEY}=${PROD_PORT}
 ${SITE_URL_KEY}=${PROD_URL}
 ${DB_NAME_KEY}=${DB_NAME}
@@ -519,12 +783,54 @@ ${WP_FILES_MOUNT_KEY}=${PROD_WP_MOUNT}
 EOF
 )"
 
-append_env_block_if_missing "${ENV_DEV_EXAMPLE}" "${PORT_KEY}" "${DEV_ENV_BLOCK}"
-append_env_block_if_missing "${ENV_PROD_EXAMPLE}" "${PORT_KEY}" "${PROD_ENV_BLOCK}"
-append_env_block_if_missing "${ENV_DEV_LOCAL}" "${PORT_KEY}" "${DEV_ENV_BLOCK}"
-append_env_block_if_missing "${ENV_PROD_LOCAL}" "${PORT_KEY}" "${PROD_ENV_BLOCK}"
+  KEY_CHECK="${PORT_KEY}"
+else
+  DEV_ENV_BLOCK="$(cat <<EOF
+${WP_PORT_KEY}=${DEV_PORT}
+${SITE_URL_KEY}=${DEV_URL}
+${DB_NAME_KEY}=${DB_NAME}
+${DB_USER_KEY}=${DB_USER}
+${DB_PASSWORD_KEY}=${DEV_DB_PASSWORD}
+${DB_ROOT_PASSWORD_KEY}=${DEV_DB_ROOT_PASSWORD}
+${WP_FILES_MOUNT_KEY}=${DEV_WP_MOUNT}
+${APP_PORT_KEY}=${APP_DEV_PORT}
+${APP_CODE_MOUNT_KEY}=${DEV_APP_CODE_MOUNT}
+${APP_DB_NAME_KEY}=${APP_DB_NAME}
+${APP_DB_USER_KEY}=${APP_DB_USER}
+${APP_DB_PASSWORD_KEY}=${DEV_APP_DB_PASSWORD}
+${DJANGO_SETTINGS_MODULE_KEY}=${DEV_DJANGO_SETTINGS_MODULE}
+${DJANGO_SECRET_KEY_KEY}=${DEV_DJANGO_SECRET_KEY}
+EOF
+)"
+
+  PROD_ENV_BLOCK="$(cat <<EOF
+${WP_PORT_KEY}=${PROD_PORT}
+${SITE_URL_KEY}=${PROD_URL}
+${DB_NAME_KEY}=${DB_NAME}
+${DB_USER_KEY}=${DB_USER}
+${DB_PASSWORD_KEY}=${PROD_DB_PASSWORD}
+${DB_ROOT_PASSWORD_KEY}=${PROD_DB_ROOT_PASSWORD}
+${WP_FILES_MOUNT_KEY}=${PROD_WP_MOUNT}
+${APP_PORT_KEY}=${APP_PROD_PORT}
+${APP_CODE_MOUNT_KEY}=${PROD_APP_CODE_MOUNT}
+${APP_DB_NAME_KEY}=${APP_DB_NAME}
+${APP_DB_USER_KEY}=${APP_DB_USER}
+${APP_DB_PASSWORD_KEY}=${PROD_APP_DB_PASSWORD}
+${DJANGO_SETTINGS_MODULE_KEY}=${PROD_DJANGO_SETTINGS_MODULE}
+${DJANGO_SECRET_KEY_KEY}=${PROD_DJANGO_SECRET_KEY}
+EOF
+)"
+
+  KEY_CHECK="${WP_PORT_KEY}"
+fi
+
+append_env_block_if_missing "${ENV_DEV_EXAMPLE}" "${KEY_CHECK}" "${DEV_ENV_BLOCK}"
+append_env_block_if_missing "${ENV_PROD_EXAMPLE}" "${KEY_CHECK}" "${PROD_ENV_BLOCK}"
+append_env_block_if_missing "${ENV_DEV_LOCAL}" "${KEY_CHECK}" "${DEV_ENV_BLOCK}"
+append_env_block_if_missing "${ENV_PROD_LOCAL}" "${KEY_CHECK}" "${PROD_ENV_BLOCK}"
 
 echo "Created project: ${NAME}"
+echo "Project type: ${TYPE}"
 echo "Description: ${DESCRIPTION}"
 echo "Storage mode: ${STORAGE}"
 echo "Site compose: ${SITE_COMPOSE_FILE}"
@@ -537,4 +843,4 @@ echo "  ./docker/scripts/up.sh dev"
 echo
 echo "Note:"
 echo "  This script registers the project and creates Docker structure."
-echo "  It does not install WordPress yet."
+echo "  It does not bootstrap WordPress or Django."

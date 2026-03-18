@@ -1,19 +1,19 @@
 services:
-  db_orthopedagogie:
+  db_demo_wordpress:
     image: ${MARIADB_IMAGE}
     restart: unless-stopped
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
     environment:
-      MARIADB_ROOT_PASSWORD: ${ORTHO_DB_ROOT_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${DEMOWP_DB_ROOT_PASSWORD}
       MARIADB_ROOT_HOST: localhost
-      MARIADB_DATABASE: ${ORTHO_DB_NAME}
-      MARIADB_USER: ${ORTHO_DB_USER}
-      MARIADB_PASSWORD: ${ORTHO_DB_PASSWORD}
+      MARIADB_DATABASE: ${DEMOWP_DB_NAME}
+      MARIADB_USER: ${DEMOWP_DB_USER}
+      MARIADB_PASSWORD: ${DEMOWP_DB_PASSWORD}
       MARIADB_AUTO_UPGRADE: "1"
     volumes:
-      - db_orthopedagogie:/var/lib/mysql
+      - db_demo_wordpress:/var/lib/mysql
     healthcheck:
       test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -p$$MARIADB_ROOT_PASSWORD || exit 1"]
       interval: 10s
@@ -21,54 +21,54 @@ services:
       retries: 12
       start_period: 30s
     networks:
-      - net_orthopedagogie
+      - net_demo_wordpress
     security_opt:
       - no-new-privileges:true
 
-  wp_orthopedagogie:
+  wp_demo_wordpress:
     image: ${WORDPRESS_IMAGE}
     restart: unless-stopped
     depends_on:
-      db_orthopedagogie:
+      db_demo_wordpress:
         condition: service_healthy
     ports:
-      - "127.0.0.1:${ORTHO_PORT}:80"
+      - "127.0.0.1:${DEMOWP_PORT}:80"
     environment:
-      WORDPRESS_DB_HOST: db_orthopedagogie:3306
-      WORDPRESS_DB_USER: ${ORTHO_DB_USER}
-      WORDPRESS_DB_PASSWORD: ${ORTHO_DB_PASSWORD}
-      WORDPRESS_DB_NAME: ${ORTHO_DB_NAME}
+      WORDPRESS_DB_HOST: db_demo_wordpress:3306
+      WORDPRESS_DB_USER: ${DEMOWP_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${DEMOWP_DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${DEMOWP_DB_NAME}
       WORDPRESS_DEBUG: ${WP_DEBUG}
       WORDPRESS_CONFIG_EXTRA: |
         define('FS_METHOD', 'direct');
     volumes:
-      - ${ORTHO_WP_FILES_MOUNT}
+      - ${DEMOWP_WP_FILES_MOUNT}
     networks:
-      - net_orthopedagogie
+      - net_demo_wordpress
     security_opt:
       - no-new-privileges:true
 
-  wpcli_orthopedagogie:
+  wpcli_demo_wordpress:
     image: ${WORDPRESS_CLI_IMAGE}
     profiles: ["cli"]
     depends_on:
-      db_orthopedagogie:
+      db_demo_wordpress:
         condition: service_healthy
     environment:
-      WORDPRESS_DB_HOST: db_orthopedagogie:3306
-      WORDPRESS_DB_USER: ${ORTHO_DB_USER}
-      WORDPRESS_DB_PASSWORD: ${ORTHO_DB_PASSWORD}
-      WORDPRESS_DB_NAME: ${ORTHO_DB_NAME}
+      WORDPRESS_DB_HOST: db_demo_wordpress:3306
+      WORDPRESS_DB_USER: ${DEMOWP_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${DEMOWP_DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${DEMOWP_DB_NAME}
       WORDPRESS_CONFIG_EXTRA: |
         define('FS_METHOD', 'direct');
     volumes:
-      - ${ORTHO_WP_FILES_MOUNT}
+      - ${DEMOWP_WP_FILES_MOUNT}
     working_dir: /var/www/html
     networks:
-      - net_orthopedagogie
+      - net_demo_wordpress
 
 volumes:
-  db_orthopedagogie:
+  db_demo_wordpress:
 
 networks:
-  net_orthopedagogie:
+  net_demo_wordpress:

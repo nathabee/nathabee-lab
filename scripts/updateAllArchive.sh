@@ -3,7 +3,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ALLOWED_ENVS=("nathabee_wordpress" "orthopedagogie" "orthopedagogiedutregor")
+ALLOWED_ENVS=("demo_fullstack" "orthopedagogie" "demo_fullstack")
 
 if [[ $# -eq 0 ]]; then
   ENVS=("${ALLOWED_ENVS[@]}")

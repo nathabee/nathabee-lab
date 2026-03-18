@@ -1,93 +1,46 @@
-## Migration roadmap for `nathabee-world`
+## map nathabee-lab
 
-### DONE: Phase 1 — Export from the current production architecture
+key rules : 
 
-Current production is still the old layout:
+``` 
+Code and docs stay generic.
+Only release examples may contain demo content.
+No external project becomes source of truth for `nathabee-lab`.
+```
 
-* `https://nathabee.de/`
-* `https://nathabee.de/orthopedagogie`
-* likely also the old path-based `orthopedagogiedutregor` setup
 
-This means the archive/export scripts must still work against the current non-Docker production install.
+### stage 1 — clean rename and public cleanup
 
-Tasks:
+- rename visible `nathabee-world` references to `nathabee-lab`
+- remove references to the private repository
+- keep `WORLD_FILE` and `world-list.json`
+- remove tracked private site names from yaml, docs, examples, and inventory
+- keep the repo generic and public-safe
 
-* fix all archive scripts after the move from `data/*.sh` to `scripts/*.sh`
-* keep export logic compatible with old path-based production URLs
-* verify export from old Apache/`/var/www/html/...` layout
-* confirm database dumps are valid and compressed
-* confirm `wp-config.php` is excluded
-* confirm `.htpasswd` is excluded
-* detect whether each site uses Apache Basic Auth and store that info in `updateArchive.json`
-* verify exported `siteurl` and `home` values are captured correctly from the old production sites
+### stage 2 — create `demo-wordpress`
 
-### DONE : Phase 2 — Publish archive data as GitHub release assets
+- add scripts to create a new WordPress project
+- add scripts to restore a release into `demo-wordpress`
+- keep code generic: no hardcoded external project names
+- allow a release example to include plugin/demo content
+- make a first public release package named `demo-wordpress`
 
-Data should no longer live in Git history.
+### stage 3 — create `demo-fullstack`
 
-Tasks:
+- add scripts to create a new fullstack project
+- add scripts to restore a WordPress + Django release into `demo-fullstack`
+- keep code generic: no hardcoded external project names
+- allow a release example to include app/demo content
+- make a first public release package named `demo-fullstack`
 
-* finalize `scripts/release-project.sh`
-* finalize `scripts/release-all.sh`
-* package each project from `data/<project>/`
-* create one release tag per project and timestamp
-* upload archives as GitHub release assets
-* verify local build artifacts stay ignored from Git
-* document the release workflow in `docs/archive-data.md`
+### stage 4 — docs and validation
 
-### DONE : Phase 3 — Restore from GitHub releases into Docker
-
-This replaces the old “restore from tracked `data/`” flow.
-
-Tasks:
-
-* create script to download a release asset from GitHub
-* extract release archive into working area
-* restore database into Dockerized WordPress/MariaDB environment
-* restore WordPress files into Docker volume/container
-* adapt restore logic from old path-based URLs to new Docker/subdomain architecture
-* handle URL rewriting during restore
-* handle optional Basic Auth recreation if archive metadata says it was used
-* document the full restore process for Docker production
-
-### TO BE TESTED Phase 4 — Switch production to Dockerized architecture
-
-After export and restore workflow are stable, production can move.
-
-Tasks:
-
-* prepare Docker production environment
-* prepare reverse proxy / Apache mapping for:
-
-  * `https://nathabee.de/`
-  * `https://orthopedagogie.nathabee.de/`
-  * `https://orthopedagogiedutregor.nathabee.de/`
-* restore sites into Docker
-* verify login, media, permalinks, plugins, and themes
-* add useful shell aliases for production Docker management
-* document start/stop/update/backup commands
-* plan cutover and rollback procedure
-
-### TO BE TESTED Phase 5 — Export back out of running Docker containers
-
-Once Docker is the source of truth, export must no longer assume direct filesystem access.
-
-Tasks:
-
-* create scripts to export archives from running Docker WordPress containers
-* extract WordPress files via `docker compose exec` / `docker cp` / tar streaming
-* export database dumps from containerized DB service
-* rebuild `data/<project>/database` and `data/<project>/wpfile`
-* continue excluding `wp-config.php` and `.htpasswd`
-* verify whether any site uses `.htpasswd` / Apache Basic Auth
-* update `updateArchive.json` from Docker-based sources
-* verify resulting archive structure stays identical to release packaging expectations
-
-### TO BE TESTED Phase 6 - mix container and mounted bind in docker, define ins world-list.json 
+- explain how to create a new WordPress project from scratch
+- explain how to create a new fullstack project from scratch
+- explain how to restore a release
+- explain how to add more plugins to a WordPress project
+- explain how to add more Django apps to a fullstack project
+- test all steps on a clean setup
+```
 
  
-### TO DO Phase 7 - create empty docker wordpress automatically
-
-* add inside the world-list.json
-* create an empty wordpress
-

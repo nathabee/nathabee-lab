@@ -7,7 +7,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 DATA_DIR="${PROJECT_ROOT}/data"
 BUILD_DIR="${PROJECT_ROOT}/build/releases"
 
-ALLOWED_ENVS=("nathabee_wordpress" "orthopedagogie" "orthopedagogiedutregor")
+ALLOWED_ENVS=("demo_fullstack" "orthopedagogie" "demo_fullstack")
 
 usage() {
   cat <<EOF
@@ -19,8 +19,8 @@ Allowed environments:
 
 Examples:
   $(basename "$0") orthopedagogie
-  $(basename "$0") --local-only nathabee_wordpress
-  $(basename "$0") --stamp 20260315-101530 orthopedagogiedutregor
+  $(basename "$0") --local-only demo_fullstack
+  $(basename "$0") --stamp 20260315-101530 demo_fullstack
 EOF
 }
 

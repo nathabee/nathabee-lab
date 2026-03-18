@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RELEASE_PROJECT_SCRIPT="${SCRIPT_DIR}/release-project.sh"
 
-ALLOWED_ENVS=("nathabee_wordpress" "orthopedagogie" "orthopedagogiedutregor")
+ALLOWED_ENVS=("demo_fullstack" "orthopedagogie" "demo_fullstack")
 
 usage() {
   cat <<EOF
@@ -20,7 +20,7 @@ Allowed environments:
 Examples:
   $(basename "$0")
   $(basename "$0") orthopedagogie
-  $(basename "$0") --local-only nathabee_wordpress orthopedagogiedutregor
+  $(basename "$0") --local-only demo_fullstack demo_fullstack
 EOF
 }
 

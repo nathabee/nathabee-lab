@@ -25,9 +25,9 @@ The public URLs are handled separately by Apache and DNS.
 
 The currently supported site names are:
 
-- `nathabee_wordpress`
+- `demo_fullstack`
 - `orthopedagogie`
-- `orthopedagogiedutregor`
+- `demo_fullstack`
 
 ## Before you start
 
@@ -77,8 +77,8 @@ docker ps
 
 ```bash id="7pp0ae"
 cd ~
-git clone git@github.com:nathabee/nathabee-world.git nathabee-world-prod
-cd nathabee-world-prod
+git clone git@github.com:nathabee/nathabee-lab.git nathabee-lab
+cd nathabee-lab
 ```
 
 ## Fetch archive data from GitHub releases
@@ -121,8 +121,8 @@ Restore each site from the fetched archive data.
 ### Root site
 
 ```bash id="fsf1fx"
-./docker/scripts/restore-site.sh prod nathabee_wordpress
-./docker/scripts/reset-admin-password.sh prod nathabee_wordpress nathabee
+./docker/scripts/restore-site.sh prod demo_fullstack
+./docker/scripts/reset-admin-password.sh prod demo_fullstack nathabee
 ```
 
 ### Orthopedagogie
@@ -133,12 +133,12 @@ Restore each site from the fetched archive data.
 ./docker/scripts/reset-admin-password.sh prod orthopedagogie nathabee
 ```
 
-### Orthopedagogiedutregor
+### demo_fullstack
 
 ```bash id="lzcrgt"
-./docker/scripts/restore-site.sh prod orthopedagogiedutregor
-./docker/scripts/fix-urls.sh prod orthopedagogiedutregor
-./docker/scripts/reset-admin-password.sh prod orthopedagogiedutregor nathabee
+./docker/scripts/restore-site.sh prod demo_fullstack
+./docker/scripts/fix-urls.sh prod demo_fullstack
+./docker/scripts/reset-admin-password.sh prod demo_fullstack nathabee
 ```
 
 ## Full restore with one batch command
@@ -146,20 +146,20 @@ Restore each site from the fetched archive data.
 If you want to restore all three sites in one pass:
 
 ```bash id="pbug4j"
-cd ~/nathabee-world-prod
+cd ~/nathabee-lab
 
 ./docker/scripts/restore-all.sh prod
 
 ./docker/scripts/fix-urls.sh prod orthopedagogie
-./docker/scripts/fix-urls.sh prod orthopedagogiedutregor
+./docker/scripts/fix-urls.sh prod demo_fullstack
 ```
 
 Then reset passwords as needed:
 
 ```bash id="tuj6iz"
-./docker/scripts/reset-admin-password.sh prod nathabee_wordpress nathabee
+./docker/scripts/reset-admin-password.sh prod demo_fullstack nathabee
 ./docker/scripts/reset-admin-password.sh prod orthopedagogie nathabee
-./docker/scripts/reset-admin-password.sh prod orthopedagogiedutregor nathabee
+./docker/scripts/reset-admin-password.sh prod demo_fullstack nathabee
 ```
 
 ## Refresh only one site in prod
@@ -171,7 +171,7 @@ This works for both bind-mount mode and named-volume mode.
 ### Example: refresh `orthopedagogie`
 
 ```bash id="b56h3i"
-cd ~/nathabee-world-prod
+cd ~/nathabee-lab
 
 docker compose --env-file docker/.env.prod -f docker/compose.yaml config >/dev/null
 
@@ -185,35 +185,35 @@ chmod +x docker/scripts/*.sh
 ./docker/scripts/reset-admin-password.sh prod orthopedagogie nathabee
 ```
 
-### Example: refresh `nathabee_wordpress`
+### Example: refresh `demo_fullstack`
 
 ```bash id="u4lswr"
-cd ~/nathabee-world-prod
+cd ~/nathabee-lab
 
 docker compose --env-file docker/.env.prod -f docker/compose.yaml config >/dev/null
 
-./scripts/fetch-release.sh <timestamp> nathabee_wordpress
+./scripts/fetch-release.sh <timestamp> demo_fullstack
 
 chmod +x docker/scripts/*.sh
 
-./docker/scripts/restore-site.sh prod nathabee_wordpress
-./docker/scripts/reset-admin-password.sh prod nathabee_wordpress nathabee
+./docker/scripts/restore-site.sh prod demo_fullstack
+./docker/scripts/reset-admin-password.sh prod demo_fullstack nathabee
 ```
 
-### Example: refresh `orthopedagogiedutregor`
+### Example: refresh `demo_fullstack`
 
 ```bash id="bb9jlx"
-cd ~/nathabee-world-prod
+cd ~/nathabee-lab
 
 docker compose --env-file docker/.env.prod -f docker/compose.yaml config >/dev/null
 
-./scripts/fetch-release.sh <timestamp> orthopedagogiedutregor
+./scripts/fetch-release.sh <timestamp> demo_fullstack
 
 chmod +x docker/scripts/*.sh
 
-./docker/scripts/restore-site.sh prod orthopedagogiedutregor
-./docker/scripts/fix-urls.sh prod orthopedagogiedutregor
-./docker/scripts/reset-admin-password.sh prod orthopedagogiedutregor nathabee
+./docker/scripts/restore-site.sh prod demo_fullstack
+./docker/scripts/fix-urls.sh prod demo_fullstack
+./docker/scripts/reset-admin-password.sh prod demo_fullstack nathabee
 ```
 
 ## Why no manual deletion of `docker/runtime/` or Docker volumes is needed
@@ -238,9 +238,9 @@ That keeps the same workflow valid for both bind mounts and named volumes.
 
 After restore:
 
-* `nathabee_wordpress` normally does **not** need `fix-urls.sh`
+* `demo_fullstack` normally does **not** need `fix-urls.sh`
 * `orthopedagogie` should run `fix-urls.sh`
-* `orthopedagogiedutregor` should run `fix-urls.sh`
+* `demo_fullstack` should run `fix-urls.sh`
 
 Reason: the two sub-sites often still contain old path-based URLs inside content or metadata.
 
@@ -271,33 +271,33 @@ These are backend checks only. Public access still depends on Apache reverse pro
 Use WP-CLI to inspect existing users before resetting passwords if you are not sure which login exists.
 
 ```bash id="psuzj8"
-docker compose --profile cli --env-file docker/.env.prod -f docker/compose.yaml run --rm --no-deps wpcli_nathabee_wordpress \
+docker compose --profile cli --env-file docker/.env.prod -f docker/compose.yaml run --rm --no-deps wpcli_demo_fullstack \
   wp --allow-root user list --fields=ID,user_login,user_email,roles
 
 docker compose --profile cli --env-file docker/.env.prod -f docker/compose.yaml run --rm --no-deps wpcli_orthopedagogie \
   wp --allow-root user list --fields=ID,user_login,user_email,roles
 
-docker compose --profile cli --env-file docker/.env.prod -f docker/compose.yaml run --rm --no-deps wpcli_orthopedagogiedutregor \
+docker compose --profile cli --env-file docker/.env.prod -f docker/compose.yaml run --rm --no-deps wpcli_demo_fullstack \
   wp --allow-root user list --fields=ID,user_login,user_email,roles
 ```
 
 ## Check logs
 
 ```bash id="mdrjwm"
-docker compose --env-file docker/.env.prod -f docker/compose.yaml logs --tail 100 db_nathabee_wordpress
-docker compose --env-file docker/.env.prod -f docker/compose.yaml logs --tail 100 wp_nathabee_wordpress
+docker compose --env-file docker/.env.prod -f docker/compose.yaml logs --tail 100 db_demo_fullstack
+docker compose --env-file docker/.env.prod -f docker/compose.yaml logs --tail 100 wp_demo_fullstack
 
 docker compose --env-file docker/.env.prod -f docker/compose.yaml logs --tail 100 db_orthopedagogie
 docker compose --env-file docker/.env.prod -f docker/compose.yaml logs --tail 100 wp_orthopedagogie
 
-docker compose --env-file docker/.env.prod -f docker/compose.yaml logs --tail 100 db_orthopedagogiedutregor
-docker compose --env-file docker/.env.prod -f docker/compose.yaml logs --tail 100 wp_orthopedagogiedutregor
+docker compose --env-file docker/.env.prod -f docker/compose.yaml logs --tail 100 db_demo_fullstack
+docker compose --env-file docker/.env.prod -f docker/compose.yaml logs --tail 100 wp_demo_fullstack
 ```
 
 ## Stop the prod environment
 
 ```bash id="g0f8jv"
-cd ~/nathabee-world-prod
+cd ~/nathabee-lab
 docker compose --env-file docker/.env.prod -f docker/compose.yaml down
 ```
 
@@ -306,10 +306,10 @@ docker compose --env-file docker/.env.prod -f docker/compose.yaml down
 Use this only when you want to completely remove the local Docker prod environment and start again from zero.
 
 ```bash id="8owes0"
-cd ~/nathabee-world-prod
+cd ~/nathabee-lab
 docker compose --env-file docker/.env.prod -f docker/compose.yaml down --volumes --rmi local
 cd ..
-rm -rf nathabee-world-prod
+rm -rf nathabee-lab
 ```
 
 ## Notes

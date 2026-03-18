@@ -7,8 +7,8 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 DATA_DIR="${PROJECT_ROOT}/data"
 DOWNLOAD_DIR="${PROJECT_ROOT}/build/releases"
 
-ALLOWED_ENVS=("nathabee_wordpress" "orthopedagogie" "orthopedagogiedutregor")
-ENV_REGEX='nathabee_wordpress|orthopedagogie|orthopedagogiedutregor'
+ALLOWED_ENVS=("demo_fullstack" "orthopedagogie" "demo_fullstack")
+ENV_REGEX='demo_fullstack|orthopedagogie|demo_fullstack'
 
 usage() {
   cat <<EOF
@@ -36,7 +36,7 @@ Examples:
   $(basename "$0") --recent 12
   $(basename "$0") --recent-stamps
   $(basename "$0") --recent-stamps 10
-  $(basename "$0") --repo nathabee/nathabee-world --recent
+  $(basename "$0") --repo nathabee/nathabee-lab --recent
 EOF
 }
 
