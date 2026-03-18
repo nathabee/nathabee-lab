@@ -1,0 +1,12 @@
+*.tar.gz
+*.log
+*.dbinfo
+/build/
+docker/.env.dev
+docker/.env.prod
+docker/runtime/**
+!docker/runtime/.gitkeep
+data/**
+!data/.gitkeep
+!data/world-list.json
+

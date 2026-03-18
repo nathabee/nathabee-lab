@@ -1,0 +1,75 @@
+services:
+  db_orthopedagogiedutregor:
+    image: ${MARIADB_IMAGE}
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MARIADB_ROOT_PASSWORD: ${TREGOR_DB_ROOT_PASSWORD}
+      MARIADB_ROOT_HOST: localhost
+      MARIADB_DATABASE: ${TREGOR_DB_NAME}
+      MARIADB_USER: ${TREGOR_DB_USER}
+      MARIADB_PASSWORD: ${TREGOR_DB_PASSWORD}
+      MARIADB_AUTO_UPGRADE: "1"
+    volumes:
+      - db_orthopedagogiedutregor:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -p$$MARIADB_ROOT_PASSWORD || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - net_orthopedagogiedutregor
+    security_opt:
+      - no-new-privileges:true
+
+  wp_orthopedagogiedutregor:
+    image: ${WORDPRESS_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      db_orthopedagogiedutregor:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${TREGOR_PORT}:80"
+    environment:
+      WORDPRESS_DB_HOST: db_orthopedagogiedutregor:3306
+      WORDPRESS_DB_USER: ${TREGOR_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${TREGOR_DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${TREGOR_DB_NAME}
+      WORDPRESS_DEBUG: ${WP_DEBUG}
+      WORDPRESS_CONFIG_EXTRA: |
+        define('FS_METHOD', 'direct');
+    volumes:
+      - ${TREGOR_WP_FILES_MOUNT}
+    networks:
+      - net_orthopedagogiedutregor
+    security_opt:
+      - no-new-privileges:true
+
+  wpcli_orthopedagogiedutregor:
+    image: ${WORDPRESS_CLI_IMAGE}
+    profiles: ["cli"]
+    depends_on:
+      db_orthopedagogiedutregor:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: db_orthopedagogiedutregor:3306
+      WORDPRESS_DB_USER: ${TREGOR_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${TREGOR_DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${TREGOR_DB_NAME}
+      WORDPRESS_CONFIG_EXTRA: |
+        define('FS_METHOD', 'direct');
+    volumes:
+      - ${TREGOR_WP_FILES_MOUNT}
+    working_dir: /var/www/html
+    networks:
+      - net_orthopedagogiedutregor
+
+volumes:
+  db_orthopedagogiedutregor:
+  wp_orthopedagogiedutregor_data:
+
+networks:
+  net_orthopedagogiedutregor:

@@ -1,0 +1,7 @@
+include:
+  - path: ./sites/nathabee_wordpress/compose.yaml
+    project_directory: .
+  - path: ./sites/orthopedagogie/compose.yaml
+    project_directory: .
+  - path: ./sites/orthopedagogiedutregor/compose.yaml
+    project_directory: .
