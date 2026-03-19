@@ -67,15 +67,15 @@ services:
     networks:
       - net_demo_fullstack
 
-  appdb_demo_fullstack:
+  djangodb_demo_fullstack:
     image: ${POSTGRES_IMAGE}
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DEMOFS_APP_DB_NAME}
-      POSTGRES_USER: ${DEMOFS_APP_DB_USER}
-      POSTGRES_PASSWORD: ${DEMOFS_APP_DB_PASSWORD}
+      POSTGRES_DB: ${DEMOFS_DJANGO_DB_NAME}
+      POSTGRES_USER: ${DEMOFS_DJANGO_DB_USER}
+      POSTGRES_PASSWORD: ${DEMOFS_DJANGO_DB_PASSWORD}
     volumes:
-      - appdb_demo_fullstack:/var/lib/postgresql/data
+      - djangodb_demo_fullstack:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
@@ -87,36 +87,41 @@ services:
     security_opt:
       - no-new-privileges:true
 
-  app_demo_fullstack:
+  django_demo_fullstack:
     image: ${PYTHON_IMAGE}
     restart: unless-stopped
     depends_on:
-      appdb_demo_fullstack:
+      djangodb_demo_fullstack:
         condition: service_healthy
+    env_file:
+      - ${DEMOFS_DJANGO_ENV_FILE}
     ports:
-      - "127.0.0.1:${DEMOFS_APP_PORT}:8000"
-    working_dir: /app
+      - "127.0.0.1:${DEMOFS_DJANGO_PORT}:8000"
+    working_dir: /django
     command: >
-      sh -lc "python manage.py runserver 0.0.0.0:8000"
+      sh -lc "if [ -x /django/.venv/bin/python ]; then exec /django/.venv/bin/python manage.py runserver 0.0.0.0:8000; else exec python manage.py runserver 0.0.0.0:8000; fi"
     environment:
       DJANGO_SETTINGS_MODULE: ${DEMOFS_DJANGO_SETTINGS_MODULE}
       DJANGO_SECRET_KEY: ${DEMOFS_DJANGO_SECRET_KEY}
-      DATABASE_HOST: appdb_demo_fullstack
+      DATABASE_HOST: djangodb_demo_fullstack
       DATABASE_PORT: 5432
-      DATABASE_NAME: ${DEMOFS_APP_DB_NAME}
-      DATABASE_USER: ${DEMOFS_APP_DB_USER}
-      DATABASE_PASSWORD: ${DEMOFS_APP_DB_PASSWORD}
+      DATABASE_NAME: ${DEMOFS_DJANGO_DB_NAME}
+      DATABASE_USER: ${DEMOFS_DJANGO_DB_USER}
+      DATABASE_PASSWORD: ${DEMOFS_DJANGO_DB_PASSWORD}
     volumes:
-      - ${DEMOFS_APP_CODE_MOUNT}
+      - ${DEMOFS_DJANGO_CODE_MOUNT}
     networks:
       - net_demo_fullstack
     security_opt:
       - no-new-privileges:true
 
+
+
+
 volumes:
   db_demo_fullstack:
   wp_demo_fullstack_data:
-  appdb_demo_fullstack:
+  djangodb_demo_fullstack:
 
 networks:
   net_demo_fullstack:

@@ -18,11 +18,11 @@ Usage:
     [--db-user DB_USER] \
     [--bind-path ./runtime/PROJECT_NAME] \
     [--active true|false] \
-    [--app-dev-port 8094] \
-    [--app-prod-port 18094] \
-    [--app-db-name APP_DB_NAME] \
-    [--app-db-user APP_DB_USER] \
-    [--app-bind-path ./runtime/PROJECT_NAME_app]
+    [--django-dev-port 8094] \
+    [--django-prod-port 18094] \
+    [--django-db-name DJANGO_DB_NAME] \
+    [--django-db-user DJANGO_DB_USER] \
+    [--django-bind-path ./runtime/PROJECT_NAME_django]
 
 Examples:
 
@@ -47,8 +47,8 @@ Examples:
       --storage volume \
       --dev-port 8083 \
       --prod-port 18083 \
-      --app-dev-port 8093 \
-      --app-prod-port 18093 \
+      --django-dev-port 8093 \
+      --django-prod-port 18093 \
       --dev-url http://localhost:8083/ \
       --prod-url https://demo-fullstack.example.test/
 EOF
@@ -263,15 +263,15 @@ services:
     networks:
       - ${NETWORK_NAME}
 
-  ${APP_DB_SERVICE}:
+  ${DJANGO_DB_SERVICE}:
     image: \${POSTGRES_IMAGE}
     restart: unless-stopped
     environment:
-      POSTGRES_DB: \${${APP_DB_NAME_KEY}}
-      POSTGRES_USER: \${${APP_DB_USER_KEY}}
-      POSTGRES_PASSWORD: \${${APP_DB_PASSWORD_KEY}}
+      POSTGRES_DB: \${${DJANGO_DB_NAME_KEY}}
+      POSTGRES_USER: \${${DJANGO_DB_USER_KEY}}
+      POSTGRES_PASSWORD: \${${DJANGO_DB_PASSWORD_KEY}}
     volumes:
-      - ${APP_DB_VOLUME}:/var/lib/postgresql/data
+      - ${DJANGO_DB_VOLUME}:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \$\$POSTGRES_USER -d \$\$POSTGRES_DB"]
       interval: 10s
@@ -283,27 +283,27 @@ services:
     security_opt:
       - no-new-privileges:true
 
-  ${APP_SERVICE}:
+  ${DJANGO_SERVICE}:
     image: \${PYTHON_IMAGE}
     restart: unless-stopped
     depends_on:
-      ${APP_DB_SERVICE}:
+      ${DJANGO_DB_SERVICE}:
         condition: service_healthy
     ports:
-      - "127.0.0.1:\${${APP_PORT_KEY}}:8000"
-    working_dir: /app
+      - "127.0.0.1:\${${DJANGO_PORT_KEY}}:8000"
+    working_dir: /django
     command: >
-      sh -lc "python manage.py runserver 0.0.0.0:8000"
+      sh -lc "if [ -x /django/.venv/bin/python ]; then exec /django/.venv/bin/python manage.py runserver 0.0.0.0:8000; else exec python manage.py runserver 0.0.0.0:8000; fi"
     environment:
       DJANGO_SETTINGS_MODULE: \${${DJANGO_SETTINGS_MODULE_KEY}}
       DJANGO_SECRET_KEY: \${${DJANGO_SECRET_KEY_KEY}}
-      DATABASE_HOST: ${APP_DB_SERVICE}
+      DATABASE_HOST: ${DJANGO_DB_SERVICE}
       DATABASE_PORT: 5432
-      DATABASE_NAME: \${${APP_DB_NAME_KEY}}
-      DATABASE_USER: \${${APP_DB_USER_KEY}}
-      DATABASE_PASSWORD: \${${APP_DB_PASSWORD_KEY}}
+      DATABASE_NAME: \${${DJANGO_DB_NAME_KEY}}
+      DATABASE_USER: \${${DJANGO_DB_USER_KEY}}
+      DATABASE_PASSWORD: \${${DJANGO_DB_PASSWORD_KEY}}
     volumes:
-      - \${${APP_CODE_MOUNT_KEY}}
+      - \${${DJANGO_CODE_MOUNT_KEY}}
     networks:
       - ${NETWORK_NAME}
     security_opt:
@@ -312,7 +312,7 @@ services:
 volumes:
   ${DB_VOLUME}:
 ${wp_volume_block}
-  ${APP_DB_VOLUME}:
+  ${DJANGO_DB_VOLUME}:
 
 networks:
   ${NETWORK_NAME}:
@@ -375,9 +375,9 @@ build_fullstack_project_json() {
     --arg wp_service "${WP_SERVICE}" \
     --arg wpcli_service "${WPCLI_SERVICE}" \
     --arg db_host_runtime "${DB_HOST_RUNTIME}" \
-    --arg app_db_service "${APP_DB_SERVICE}" \
-    --arg app_service "${APP_SERVICE}" \
-    --arg app_db_host_runtime "${APP_DB_HOST_RUNTIME}" \
+    --arg django_db_service "${DJANGO_DB_SERVICE}" \
+    --arg django_service "${DJANGO_SERVICE}" \
+    --arg django_db_host_runtime "${DJANGO_DB_HOST_RUNTIME}" \
     --arg wp_port_key "${WP_PORT_KEY}" \
     --arg site_url_key "${SITE_URL_KEY}" \
     --arg db_name_key "${DB_NAME_KEY}" \
@@ -385,11 +385,11 @@ build_fullstack_project_json() {
     --arg db_password_key "${DB_PASSWORD_KEY}" \
     --arg db_root_password_key "${DB_ROOT_PASSWORD_KEY}" \
     --arg wp_files_mount_key "${WP_FILES_MOUNT_KEY}" \
-    --arg app_port_key "${APP_PORT_KEY}" \
-    --arg app_code_mount_key "${APP_CODE_MOUNT_KEY}" \
-    --arg app_db_name_key "${APP_DB_NAME_KEY}" \
-    --arg app_db_user_key "${APP_DB_USER_KEY}" \
-    --arg app_db_password_key "${APP_DB_PASSWORD_KEY}" \
+    --arg django_port_key "${DJANGO_PORT_KEY}" \
+    --arg django_code_mount_key "${DJANGO_CODE_MOUNT_KEY}" \
+    --arg django_db_name_key "${DJANGO_DB_NAME_KEY}" \
+    --arg django_db_user_key "${DJANGO_DB_USER_KEY}" \
+    --arg django_db_password_key "${DJANGO_DB_PASSWORD_KEY}" \
     --arg django_settings_module_key "${DJANGO_SETTINGS_MODULE_KEY}" \
     --arg django_secret_key_key "${DJANGO_SECRET_KEY_KEY}" \
     '{
@@ -404,9 +404,9 @@ build_fullstack_project_json() {
         wp_service: $wp_service,
         wpcli_service: $wpcli_service,
         db_host_runtime: $db_host_runtime,
-        app_db_service: $app_db_service,
-        app_service: $app_service,
-        app_db_host_runtime: $app_db_host_runtime
+        django_db_service: $django_db_service,
+        django_service: $django_service,
+        django_db_host_runtime: $django_db_host_runtime
       },
       env: {
         wp_port: $wp_port_key,
@@ -416,11 +416,11 @@ build_fullstack_project_json() {
         db_password: $db_password_key,
         db_root_password: $db_root_password_key,
         wp_files_mount: $wp_files_mount_key,
-        app_port: $app_port_key,
-        app_code_mount: $app_code_mount_key,
-        app_db_name: $app_db_name_key,
-        app_db_user: $app_db_user_key,
-        app_db_password: $app_db_password_key,
+        django_port: $django_port_key,
+        django_code_mount: $django_code_mount_key,
+        django_db_name: $django_db_name_key,
+        django_db_user: $django_db_user_key,
+        django_db_password: $django_db_password_key,
         django_settings_module: $django_settings_module_key,
         django_secret_key: $django_secret_key_key
       }
@@ -441,11 +441,11 @@ DB_USER=""
 BIND_PATH=""
 ACTIVE="true"
 
-APP_DEV_PORT=""
-APP_PROD_PORT=""
-APP_DB_NAME=""
-APP_DB_USER=""
-APP_BIND_PATH=""
+DJANGO_DEV_PORT=""
+DJANGO_PROD_PORT=""
+DJANGO_DB_NAME=""
+DJANGO_DB_USER=""
+DJANGO_BIND_PATH=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -501,24 +501,24 @@ while [[ $# -gt 0 ]]; do
       ACTIVE="${2:-}"
       shift 2
       ;;
-    --app-dev-port)
-      APP_DEV_PORT="${2:-}"
+    --django-dev-port)
+      DJANGO_DEV_PORT="${2:-}"
       shift 2
       ;;
-    --app-prod-port)
-      APP_PROD_PORT="${2:-}"
+    --django-prod-port)
+      DJANGO_PROD_PORT="${2:-}"
       shift 2
       ;;
-    --app-db-name)
-      APP_DB_NAME="${2:-}"
+    --django-db-name)
+      DJANGO_DB_NAME="${2:-}"
       shift 2
       ;;
-    --app-db-user)
-      APP_DB_USER="${2:-}"
+    --django-db-user)
+      DJANGO_DB_USER="${2:-}"
       shift 2
       ;;
-    --app-bind-path)
-      APP_BIND_PATH="${2:-}"
+    --django-bind-path)
+      DJANGO_BIND_PATH="${2:-}"
       shift 2
       ;;
     -h|--help)
@@ -569,13 +569,13 @@ if [[ ! "${DEV_PORT}" =~ ^[0-9]+$ || ! "${PROD_PORT}" =~ ^[0-9]+$ ]]; then
 fi
 
 if [[ "${TYPE}" == "fullstack" ]]; then
-  if [[ -z "${APP_DEV_PORT}" || -z "${APP_PROD_PORT}" ]]; then
-    echo "Fullstack projects require --app-dev-port and --app-prod-port."
+  if [[ -z "${DJANGO_DEV_PORT}" || -z "${DJANGO_PROD_PORT}" ]]; then
+    echo "Fullstack projects require --django-dev-port and --django-prod-port."
     exit 1
   fi
 
-  if [[ ! "${APP_DEV_PORT}" =~ ^[0-9]+$ || ! "${APP_PROD_PORT}" =~ ^[0-9]+$ ]]; then
-    echo "App ports must be numeric."
+  if [[ ! "${DJANGO_DEV_PORT}" =~ ^[0-9]+$ || ! "${DJANGO_PROD_PORT}" =~ ^[0-9]+$ ]]; then
+    echo "Django ports must be numeric."
     exit 1
   fi
 fi
@@ -591,9 +591,9 @@ SITE_COMPOSE_FILE="${SITE_DIR}/compose.yaml"
 DATA_SITE_DIR="${REPO_ROOT}/data/${NAME}"
 DATA_DB_DIR="${DATA_SITE_DIR}/database"
 DATA_WP_DIR="${DATA_SITE_DIR}/wpfile"
-DATA_APP_DIR="${DATA_SITE_DIR}/app"
+DATA_DJANGO_DIR="${DATA_SITE_DIR}/django"
 RUNTIME_DIR="${DOCKER_DIR}/runtime/${NAME}"
-APP_RUNTIME_DIR="${DOCKER_DIR}/runtime/${NAME}_app"
+DJANGO_RUNTIME_DIR="${DOCKER_DIR}/runtime/${NAME}_django"
 
 ENV_DEV_EXAMPLE="${DOCKER_DIR}/env.dev.example"
 ENV_PROD_EXAMPLE="${DOCKER_DIR}/env.prod.example"
@@ -678,33 +678,34 @@ if [[ "${TYPE}" == "wordpress" ]]; then
   PORT_KEY="${CODE}_PORT"
 else
   WP_PORT_KEY="${CODE}_WP_PORT"
-  APP_PORT_KEY="${CODE}_APP_PORT"
-  APP_DB_SERVICE="appdb_${NAME}"
-  APP_SERVICE="app_${NAME}"
-  APP_DB_HOST_RUNTIME="${APP_DB_SERVICE}:5432"
-  APP_DB_VOLUME="appdb_${NAME}"
 
-  APP_DB_NAME_KEY="${CODE}_APP_DB_NAME"
-  APP_DB_USER_KEY="${CODE}_APP_DB_USER"
-  APP_DB_PASSWORD_KEY="${CODE}_APP_DB_PASSWORD"
-  APP_CODE_MOUNT_KEY="${CODE}_APP_CODE_MOUNT"
+  DJANGO_PORT_KEY="${CODE}_DJANGO_PORT"
+  DJANGO_DB_SERVICE="djangodb_${NAME}"
+  DJANGO_SERVICE="django_${NAME}"
+  DJANGO_DB_HOST_RUNTIME="${DJANGO_DB_SERVICE}:5432"
+  DJANGO_DB_VOLUME="djangodb_${NAME}"
+
+  DJANGO_DB_NAME_KEY="${CODE}_DJANGO_DB_NAME"
+  DJANGO_DB_USER_KEY="${CODE}_DJANGO_DB_USER"
+  DJANGO_DB_PASSWORD_KEY="${CODE}_DJANGO_DB_PASSWORD"
+  DJANGO_CODE_MOUNT_KEY="${CODE}_DJANGO_CODE_MOUNT"
   DJANGO_SETTINGS_MODULE_KEY="${CODE}_DJANGO_SETTINGS_MODULE"
   DJANGO_SECRET_KEY_KEY="${CODE}_DJANGO_SECRET_KEY"
 
-  if [[ -z "${APP_DB_NAME}" ]]; then
-    APP_DB_NAME="${NAME}_app"
+  if [[ -z "${DJANGO_DB_NAME}" ]]; then
+    DJANGO_DB_NAME="${NAME}_django"
   fi
 
-  if [[ -z "${APP_DB_USER}" ]]; then
-    APP_DB_USER="${NAME}_app_user"
+  if [[ -z "${DJANGO_DB_USER}" ]]; then
+    DJANGO_DB_USER="${NAME}_django_user"
   fi
 
-  if [[ -z "${APP_BIND_PATH}" ]]; then
-    APP_BIND_PATH="./runtime/${NAME}_app"
+  if [[ -z "${DJANGO_BIND_PATH}" ]]; then
+    DJANGO_BIND_PATH="./runtime/${NAME}_django"
   fi
 
-  DEV_APP_DB_PASSWORD="change_me_dev_${NAME}_app_db_password"
-  PROD_APP_DB_PASSWORD="change_me_prod_${NAME}_app_db_password"
+  DEV_DJANGO_DB_PASSWORD="change_me_dev_${NAME}_django_db_password"
+  PROD_DJANGO_DB_PASSWORD="change_me_prod_${NAME}_django_db_password"
   DEV_DJANGO_SETTINGS_MODULE="config.settings"
   PROD_DJANGO_SETTINGS_MODULE="config.settings"
   DEV_DJANGO_SECRET_KEY="change_me_dev_${NAME}_django_secret"
@@ -723,7 +724,7 @@ mkdir -p "${SITE_DIR}"
 mkdir -p "${DATA_DB_DIR}" "${DATA_WP_DIR}"
 
 if [[ "${TYPE}" == "fullstack" ]]; then
-  mkdir -p "${DATA_APP_DIR}"
+  mkdir -p "${DATA_DJANGO_DIR}"
 fi
 
 if [[ "${STORAGE}" == "bind" ]]; then
@@ -731,9 +732,9 @@ if [[ "${STORAGE}" == "bind" ]]; then
 fi
 
 if [[ "${TYPE}" == "fullstack" ]]; then
-  mkdir -p "${APP_RUNTIME_DIR}"
-  DEV_APP_CODE_MOUNT="${APP_BIND_PATH}:/app"
-  PROD_APP_CODE_MOUNT="${APP_BIND_PATH}:/app"
+  mkdir -p "${DJANGO_RUNTIME_DIR}"
+  DEV_DJANGO_CODE_MOUNT="${DJANGO_BIND_PATH}:/django"
+  PROD_DJANGO_CODE_MOUNT="${DJANGO_BIND_PATH}:/django"
 fi
 
 if [[ "${TYPE}" == "wordpress" ]]; then
@@ -793,11 +794,11 @@ ${DB_USER_KEY}=${DB_USER}
 ${DB_PASSWORD_KEY}=${DEV_DB_PASSWORD}
 ${DB_ROOT_PASSWORD_KEY}=${DEV_DB_ROOT_PASSWORD}
 ${WP_FILES_MOUNT_KEY}=${DEV_WP_MOUNT}
-${APP_PORT_KEY}=${APP_DEV_PORT}
-${APP_CODE_MOUNT_KEY}=${DEV_APP_CODE_MOUNT}
-${APP_DB_NAME_KEY}=${APP_DB_NAME}
-${APP_DB_USER_KEY}=${APP_DB_USER}
-${APP_DB_PASSWORD_KEY}=${DEV_APP_DB_PASSWORD}
+${DJANGO_PORT_KEY}=${DJANGO_DEV_PORT}
+${DJANGO_CODE_MOUNT_KEY}=${DEV_DJANGO_CODE_MOUNT}
+${DJANGO_DB_NAME_KEY}=${DJANGO_DB_NAME}
+${DJANGO_DB_USER_KEY}=${DJANGO_DB_USER}
+${DJANGO_DB_PASSWORD_KEY}=${DEV_DJANGO_DB_PASSWORD}
 ${DJANGO_SETTINGS_MODULE_KEY}=${DEV_DJANGO_SETTINGS_MODULE}
 ${DJANGO_SECRET_KEY_KEY}=${DEV_DJANGO_SECRET_KEY}
 EOF
@@ -811,11 +812,11 @@ ${DB_USER_KEY}=${DB_USER}
 ${DB_PASSWORD_KEY}=${PROD_DB_PASSWORD}
 ${DB_ROOT_PASSWORD_KEY}=${PROD_DB_ROOT_PASSWORD}
 ${WP_FILES_MOUNT_KEY}=${PROD_WP_MOUNT}
-${APP_PORT_KEY}=${APP_PROD_PORT}
-${APP_CODE_MOUNT_KEY}=${PROD_APP_CODE_MOUNT}
-${APP_DB_NAME_KEY}=${APP_DB_NAME}
-${APP_DB_USER_KEY}=${APP_DB_USER}
-${APP_DB_PASSWORD_KEY}=${PROD_APP_DB_PASSWORD}
+${DJANGO_PORT_KEY}=${DJANGO_PROD_PORT}
+${DJANGO_CODE_MOUNT_KEY}=${PROD_DJANGO_CODE_MOUNT}
+${DJANGO_DB_NAME_KEY}=${DJANGO_DB_NAME}
+${DJANGO_DB_USER_KEY}=${DJANGO_DB_USER}
+${DJANGO_DB_PASSWORD_KEY}=${PROD_DJANGO_DB_PASSWORD}
 ${DJANGO_SETTINGS_MODULE_KEY}=${PROD_DJANGO_SETTINGS_MODULE}
 ${DJANGO_SECRET_KEY_KEY}=${PROD_DJANGO_SECRET_KEY}
 EOF

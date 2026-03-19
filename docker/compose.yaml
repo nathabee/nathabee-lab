@@ -1,5 +1,5 @@
 include:
   - path: ./sites/demo_wordpress/compose.yaml
-    project_directory: .
+    project_directory: . 
   - path: ./sites/demo_fullstack/compose.yaml
     project_directory: .

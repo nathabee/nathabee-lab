@@ -66,8 +66,7 @@ chmod 600 docker/.env.dev docker/.env.prod
 Examples:
 
 ```bash
-./docker/scripts/restore-site.sh dev demo_fullstack
-./docker/scripts/restore-site.sh dev orthopedagogie
+./docker/scripts/restore-site.sh dev demo_fullstack 
 ./docker/scripts/restore-site.sh dev demo_fullstack
 ```
 

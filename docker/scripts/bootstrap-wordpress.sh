@@ -146,7 +146,11 @@ set +a
 get_project_json() {
   jq -ec --arg site "$1" '
     (.projects // .)[]
-    | select((.projecttype // .type // "") == "wordpress")
+    | select(
+          ((.projecttype // .type // "") == "wordpress")
+          or
+          ((.projecttype // .type // "") == "fullstack")
+        )
     | select((.projectname // .name) == $site)
   ' "${WORLD_FILE}"
 }
@@ -183,7 +187,7 @@ DB_USER_KEY="$(jq -r '.env.db_user // empty' <<< "${PROJECT_JSON}")"
 DB_PASSWORD_KEY="$(jq -r '.env.db_password // empty' <<< "${PROJECT_JSON}")"
 SITE_URL_KEY="$(jq -r '.env.site_url // empty' <<< "${PROJECT_JSON}")"
 
-if [[ "${PROJECT_TYPE}" != "wordpress" ]]; then
+if [[ "${PROJECT_TYPE}" != "wordpress"  &&  "${PROJECT_TYPE}" != "fullstack" ]]; then
   echo "Project ${SITE} is not a wordpress project."
   exit 1
 fi

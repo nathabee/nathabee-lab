@@ -5,13 +5,13 @@
 #
 # Examples:
 #   source docker/scripts/alias.sh dev
-#   source docker/scripts/alias.sh dev orthopedagogie
+#   source docker/scripts/alias.sh dev demo_fullstack
 #   nwenv prod
 #   nwsite demo_fullstack
 #   nwup
 #   nwwpls
 #   nwwp option get home
-#   nwexportsite orthopedagogie
+#   nwexportsite demo_fullstack
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   echo "This file must be sourced, not executed."

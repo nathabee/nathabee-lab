@@ -29,15 +29,15 @@
       "active": true,
       "description": "Demo fullstack project",
       "datecreation": "2026-03-18",
-      "storage_mode": "volume",
+      "storage_mode": "bind",
       "compose": {
         "db_service": "db_demo_fullstack",
         "wp_service": "wp_demo_fullstack",
         "wpcli_service": "wpcli_demo_fullstack",
         "db_host_runtime": "db_demo_fullstack:3306",
-        "app_db_service": "appdb_demo_fullstack",
-        "app_service": "app_demo_fullstack",
-        "app_db_host_runtime": "appdb_demo_fullstack:5432"
+        "django_db_service": "djangodb_demo_fullstack",
+        "django_service": "django_demo_fullstack",
+        "django_db_host_runtime": "djangodb_demo_fullstack:5432"
       },
       "env": {
         "wp_port": "DEMOFS_WP_PORT",
@@ -47,11 +47,11 @@
         "db_password": "DEMOFS_DB_PASSWORD",
         "db_root_password": "DEMOFS_DB_ROOT_PASSWORD",
         "wp_files_mount": "DEMOFS_WP_FILES_MOUNT",
-        "app_port": "DEMOFS_APP_PORT",
-        "app_code_mount": "DEMOFS_APP_CODE_MOUNT",
-        "app_db_name": "DEMOFS_APP_DB_NAME",
-        "app_db_user": "DEMOFS_APP_DB_USER",
-        "app_db_password": "DEMOFS_APP_DB_PASSWORD",
+        "django_port": "DEMOFS_DJANGO_PORT",
+        "django_code_mount": "DEMOFS_DJANGO_CODE_MOUNT",
+        "django_db_name": "DEMOFS_DJANGO_DB_NAME",
+        "django_db_user": "DEMOFS_DJANGO_DB_USER",
+        "django_db_password": "DEMOFS_DJANGO_DB_PASSWORD",
         "django_settings_module": "DEMOFS_DJANGO_SETTINGS_MODULE",
         "django_secret_key": "DEMOFS_DJANGO_SECRET_KEY"
       }
