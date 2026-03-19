@@ -4,7 +4,7 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  ./docker/scripts/activate-project.sh <project_name>
+  ./docker/scripts/activate-project.sh <project_name> [dev|prod]
 
 What it does:
   - sets active=true in data/world-list.json
@@ -14,6 +14,9 @@ What it does NOT do:
   - it does not restore runtime data
   - it does not recreate deleted Docker volumes
   - it does not bootstrap WordPress or Django
+
+Notes:
+  - the optional dev|prod argument is only used to print the next suggested command
 EOF
 }
 
@@ -26,8 +29,14 @@ require_cmd() {
 }
 
 PROJECT_NAME="${1:-}"
+MODE_HINT="${2:-}"
 
 if [[ -z "${PROJECT_NAME}" ]]; then
+  usage
+  exit 1
+fi
+
+if [[ -n "${MODE_HINT}" && "${MODE_HINT}" != "dev" && "${MODE_HINT}" != "prod" ]]; then
   usage
   exit 1
 fi
@@ -58,11 +67,20 @@ if [[ ! -f "${PROJECT_COMPOSE_FILE}" ]]; then
   exit 1
 fi
 
-if ! jq -e --arg project "${PROJECT_NAME}" '
-  (.projects // .)[]
-  | select((.projectname // .name) == $project)
-' "${WORLD_FILE}" >/dev/null 2>&1; then
+PROJECT_JSON="$(
+  jq -e --arg project "${PROJECT_NAME}" '
+    (.projects // .)[]
+    | select((.projectname // .name) == $project)
+  ' "${WORLD_FILE}"
+)" || {
   echo "Project not found in ${WORLD_FILE}: ${PROJECT_NAME}"
+  exit 1
+}
+
+PROJECT_TYPE="$(jq -r '.projecttype // .type // empty' <<< "${PROJECT_JSON}")"
+
+if [[ "${PROJECT_TYPE}" != "wordpress" && "${PROJECT_TYPE}" != "fullstack" ]]; then
+  echo "Unsupported or missing project type for ${PROJECT_NAME}: ${PROJECT_TYPE}"
   exit 1
 fi
 
@@ -156,13 +174,34 @@ else:
 PY
 }
 
+print_next_steps() {
+  local mode_display="${MODE_HINT:-<dev|prod>}"
+
+  echo
+  echo "Project activated: ${PROJECT_NAME}"
+  echo "Project type: ${PROJECT_TYPE}"
+  echo
+
+  if [[ "${PROJECT_TYPE}" == "wordpress" ]]; then
+    echo "Next step depends on what you want:"
+    echo "  - restore archived data:"
+    echo "      ./docker/scripts/restore-site.sh ${mode_display} ${PROJECT_NAME}"
+    echo "  - fresh WordPress install:"
+    echo "      ./docker/scripts/bootstrap-wordpress.sh ${mode_display} ${PROJECT_NAME} ..."
+    return 0
+  fi
+
+  if [[ "${PROJECT_TYPE}" == "fullstack" ]]; then
+    echo "Next step depends on what you want:"
+    echo "  - restore archived fullstack data:"
+    echo "      ./docker/scripts/restore-fullstack.sh ${mode_display} ${PROJECT_NAME}"
+    echo "  - fresh rebuild:"
+    echo "      ./docker/scripts/bootstrap-wordpress.sh ${mode_display} ${PROJECT_NAME} ..."
+    echo "      ./docker/scripts/bootstrap-django.sh ${mode_display} ${PROJECT_NAME}"
+    return 0
+  fi
+}
+
 mark_project_active
 uncomment_root_include
-
-echo
-echo "Project activated: ${PROJECT_NAME}"
-echo
-echo "Next step depends on what you want:"
-echo "  - restore archived WordPress data: ./docker/scripts/restore-site.sh dev ${PROJECT_NAME}"
-echo "  - fresh WordPress install:       ./docker/scripts/bootstrap-wordpress.sh dev ${PROJECT_NAME} ..."
-echo "  - fullstack Django setup:        ./docker/scripts/bootstrap-django.sh dev ${PROJECT_NAME}"
+print_next_steps

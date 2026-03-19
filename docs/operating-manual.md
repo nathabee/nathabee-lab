@@ -301,6 +301,13 @@ Typical full flow:
 
 ## Case 3 — Restore after a project was deleted
 
+This covers the case a was deleted with :
+```bash
+source docker/scripts/alias.sh dev
+./docker/scripts/delete-project.sh dev demo_fullstack
+
+
+``` 
 If the project definition still exists in:
 
 * `docker/sites/<project>`

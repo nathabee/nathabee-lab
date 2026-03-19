@@ -7,14 +7,13 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 DATA_DIR="${PROJECT_ROOT}/data"
 DOWNLOAD_DIR="${PROJECT_ROOT}/build/releases"
 
-ALLOWED_ENVS=("demo_fullstack" "orthopedagogie" "demo_fullstack")
-ENV_REGEX='demo_fullstack|orthopedagogie|demo_fullstack'
+PROJECT_REGEX='[a-z0-9_]+'
 
 usage() {
   cat <<EOF
 Usage:
-  $(basename "$0") [--repo owner/name] <YYYYMMDD-HHMMSS> [environment ...]
-  $(basename "$0") [--repo owner/name] --list <YYYYMMDD-HHMMSS> [environment ...]
+  $(basename "$0") [--repo owner/name] <YYYYMMDD-HHMMSS> [project ...]
+  $(basename "$0") [--repo owner/name] --list <YYYYMMDD-HHMMSS> [project ...]
   $(basename "$0") [--repo owner/name] --recent [count]
   $(basename "$0") [--repo owner/name] --recent-stamps [count]
 
@@ -23,14 +22,11 @@ Description:
   and extract them into ./data.
 
 Release tag pattern:
-  data-<environment>-<YYYYMMDD-HHMMSS>
-
-Known environments:
-  ${ALLOWED_ENVS[*]}
+  data-<project>-<YYYYMMDD-HHMMSS>
 
 Examples:
   $(basename "$0") 20260315-101530
-  $(basename "$0") 20260315-101530 orthopedagogie
+  $(basename "$0") 20260315-101530 demo_fullstack
   $(basename "$0") --list 20260315-101530
   $(basename "$0") --recent
   $(basename "$0") --recent 12
@@ -46,19 +42,6 @@ require_cmd() {
     echo "Error: required command not found: ${cmd}" >&2
     exit 1
   fi
-}
-
-is_allowed_env() {
-  local candidate="$1"
-  local allowed
-
-  for allowed in "${ALLOWED_ENVS[@]}"; do
-    if [[ "${allowed}" == "${candidate}" ]]; then
-      return 0
-    fi
-  done
-
-  return 1
 }
 
 derive_repo_from_git_remote() {
@@ -101,22 +84,6 @@ validate_stamp() {
   fi
 }
 
-resolve_envs() {
-  if [[ ${#REQUESTED_ENVS[@]} -eq 0 ]]; then
-    ENVS=("${ALLOWED_ENVS[@]}")
-  else
-    ENVS=("${REQUESTED_ENVS[@]}")
-  fi
-
-  for ENV_NAME in "${ENVS[@]}"; do
-    if ! is_allowed_env "${ENV_NAME}"; then
-      echo "Error: unknown environment '${ENV_NAME}'" >&2
-      echo "Allowed values: ${ALLOWED_ENVS[*]}" >&2
-      exit 1
-    fi
-  done
-}
-
 ensure_repo_and_auth() {
   require_cmd gh
   require_cmd git
@@ -131,6 +98,35 @@ ensure_repo_and_auth() {
   fi
 }
 
+fetch_matching_projects_for_stamp() {
+  require_cmd jq
+
+  gh api "repos/${REPO}/releases?per_page=100" | jq -r \
+    --arg stamp "${STAMP}" \
+    --arg project_regex "${PROJECT_REGEX}" \
+    '
+      .[]
+      | (.tag_name // "")
+      | select(test("^data-(" + $project_regex + ")-" + $stamp + "$"))
+      | capture("^data-(?<project>(" + $project_regex + "))-" + $stamp + "$")
+      | .project
+    ' | sort -u
+}
+
+resolve_projects() {
+  if [[ ${#REQUESTED_PROJECTS[@]} -gt 0 ]]; then
+    PROJECTS=("${REQUESTED_PROJECTS[@]}")
+    return 0
+  fi
+
+  mapfile -t PROJECTS < <(fetch_matching_projects_for_stamp)
+
+  if [[ ${#PROJECTS[@]} -eq 0 ]]; then
+    echo "Error: no matching releases found for stamp ${STAMP} in ${REPO}" >&2
+    exit 1
+  fi
+}
+
 list_matching_releases() {
   local found_count=0
 
@@ -138,8 +134,8 @@ list_matching_releases() {
   echo "Stamp:      ${STAMP}"
   echo
 
-  for ENV_NAME in "${ENVS[@]}"; do
-    local tag="data-${ENV_NAME}-${STAMP}"
+  for PROJECT_NAME in "${PROJECTS[@]}"; do
+    local tag="data-${PROJECT_NAME}-${STAMP}"
 
     if gh release view "${tag}" --repo "${REPO}" >/dev/null 2>&1; then
       echo "[FOUND]   ${tag}"
@@ -175,21 +171,21 @@ list_recent_releases() {
   echo
 
   gh api "repos/${REPO}/releases?per_page=${api_limit}" | jq -r \
-    --arg env_regex "${ENV_REGEX}" \
+    --arg project_regex "${PROJECT_REGEX}" \
     '
       .[]
       | {
           tag: (.tag_name // ""),
           published: (.published_at // .created_at // "")
         }
-      | select(.tag | test("^data-(" + $env_regex + ")-[0-9]{8}-[0-9]{6}$"))
+      | select(.tag | test("^data-(" + $project_regex + ")-[0-9]{8}-[0-9]{6}$"))
       | . + (
           .tag
-          | capture("^data-(?<env>(" + $env_regex + "))-(?<stamp>[0-9]{8}-[0-9]{6})$")
+          | capture("^data-(?<project>(" + $project_regex + "))-(?<stamp>[0-9]{8}-[0-9]{6})$")
         )
-      | "\(.published)\t\(.env)\t\(.stamp)\t\(.tag)"
+      | "\(.published)\t\(.project)\t\(.stamp)\t\(.tag)"
     ' | awk 'BEGIN {
-        printf "%-22s %-24s %-18s %s\n", "published_at", "environment", "stamp", "tag";
+        printf "%-22s %-24s %-18s %s\n", "published_at", "project", "stamp", "tag";
         printf "%-22s %-24s %-18s %s\n", "----------------------", "------------------------", "------------------", "----------------------------------------------";
       }
       {
@@ -215,7 +211,7 @@ list_recent_stamps() {
   echo
 
   gh api "repos/${REPO}/releases?per_page=${api_limit}" | jq -r \
-    --arg env_regex "${ENV_REGEX}" \
+    --arg project_regex "${PROJECT_REGEX}" \
     --argjson wanted "${RECENT_COUNT}" \
     '
       [
@@ -224,10 +220,10 @@ list_recent_stamps() {
             tag: (.tag_name // ""),
             published: (.published_at // .created_at // "")
           }
-        | select(.tag | test("^data-(" + $env_regex + ")-[0-9]{8}-[0-9]{6}$"))
+        | select(.tag | test("^data-(" + $project_regex + ")-[0-9]{8}-[0-9]{6}$"))
         | . + (
             .tag
-            | capture("^data-(?<env>(" + $env_regex + "))-(?<stamp>[0-9]{8}-[0-9]{6})$")
+            | capture("^data-(?<project>(" + $project_regex + "))-(?<stamp>[0-9]{8}-[0-9]{6})$")
           )
       ]
       | sort_by(.published)
@@ -236,16 +232,16 @@ list_recent_stamps() {
       | map({
           stamp: .[0].stamp,
           latest_published: (map(.published) | max),
-          envs: (map(.env) | unique | join(", ")),
+          projects: (map(.project) | unique | join(", ")),
           tags: (map(.tag) | unique | join(" | "))
         })
       | sort_by(.latest_published)
       | reverse
       | .[:$wanted]
       | .[]
-      | "\(.latest_published)\t\(.stamp)\t\(.envs)\t\(.tags)"
+      | "\(.latest_published)\t\(.stamp)\t\(.projects)\t\(.tags)"
     ' | awk 'BEGIN {
-        printf "%-22s %-18s %-50s %s\n", "latest_published", "stamp", "environments", "tags";
+        printf "%-22s %-18s %-50s %s\n", "latest_published", "stamp", "projects", "tags";
         printf "%-22s %-18s %-50s %s\n", "----------------------", "------------------", "--------------------------------------------------", "----------------------------------------------";
       }
       {
@@ -255,10 +251,10 @@ list_recent_stamps() {
         sub(/^  */, "", $0);
 
         split($0, parts, "\t");
-        envs=parts[1];
+        projects=parts[1];
         tags=parts[2];
 
-        printf "%-22s %-18s %-50s %s\n", first, second, envs, tags;
+        printf "%-22s %-18s %-50s %s\n", first, second, projects, tags;
       }'
 }
 
@@ -268,8 +264,8 @@ LIST_ONLY=0
 LIST_RECENT=0
 LIST_RECENT_STAMPS=0
 RECENT_COUNT=10
-REQUESTED_ENVS=()
-ENVS=()
+REQUESTED_PROJECTS=()
+PROJECTS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -311,7 +307,7 @@ while [[ $# -gt 0 ]]; do
       if [[ -z "${STAMP}" ]]; then
         STAMP="$1"
       else
-        REQUESTED_ENVS+=("$1")
+        REQUESTED_PROJECTS+=("$1")
       fi
       shift
       ;;
@@ -343,7 +339,7 @@ if [[ -z "${STAMP}" ]]; then
 fi
 
 validate_stamp "${STAMP}"
-resolve_envs
+resolve_projects
 
 if [[ "${LIST_ONLY}" -eq 1 ]]; then
   list_matching_releases
@@ -358,11 +354,11 @@ FOUND_COUNT=0
 DOWNLOADED_TAGS=()
 MISSING_TAGS=()
 
-for ENV_NAME in "${ENVS[@]}"; do
-  TAG="data-${ENV_NAME}-${STAMP}"
+for PROJECT_NAME in "${PROJECTS[@]}"; do
+  TAG="data-${PROJECT_NAME}-${STAMP}"
   ASSET="${TAG}.tar.gz"
   ASSET_PATH="${DOWNLOAD_DIR}/${ASSET}"
-  TARGET_ENV_DIR="${DATA_DIR}/${ENV_NAME}"
+  TARGET_PROJECT_DIR="${DATA_DIR}/${PROJECT_NAME}"
 
   if gh release view "${TAG}" --repo "${REPO}" >/dev/null 2>&1; then
     echo "Found release: ${TAG}"
@@ -373,16 +369,16 @@ for ENV_NAME in "${ENVS[@]}"; do
       --dir "${DOWNLOAD_DIR}" \
       --clobber
 
-    if [[ -d "${TARGET_ENV_DIR}" ]]; then
-      echo "Removing existing local data directory: ${TARGET_ENV_DIR}"
-      rm -rf "${TARGET_ENV_DIR}"
+    if [[ -d "${TARGET_PROJECT_DIR}" ]]; then
+      echo "Removing existing local data directory: ${TARGET_PROJECT_DIR}"
+      rm -rf "${TARGET_PROJECT_DIR}"
     fi
 
     echo "Extracting ${ASSET} into ${DATA_DIR}"
     tar -xzf "${ASSET_PATH}" -C "${DATA_DIR}"
 
-    if [[ ! -f "${TARGET_ENV_DIR}/updateArchive.json" ]]; then
-      echo "Error: extracted archive for ${ENV_NAME} is incomplete" >&2
+    if [[ ! -f "${TARGET_PROJECT_DIR}/updateArchive.json" ]]; then
+      echo "Error: extracted archive for ${PROJECT_NAME} is incomplete" >&2
       exit 1
     fi
 

@@ -35,7 +35,7 @@ require_cmd jq
 require_cmd docker
 require_cmd python3
 require_cmd rsync
-require_cmd htpasswd
+# require_cmd htpasswd
 
 if [[ ! -f "${ENV_FILE}" ]]; then
   echo "Missing env file: ${ENV_FILE}"
@@ -386,9 +386,10 @@ if [[ -f "${HTACCESS_PATH}" ]]; then
       echo "Keeping Apache Basic Auth directives for prod restore..."
       sed -i 's#^AuthUserFile .*#AuthUserFile /var/www/html/.htpasswd#' "${HTACCESS_PATH}" || true
 
-      prompt_basic_auth_credentials "${PROJECT_NAME}"
-      write_basic_auth_file "${HTPASSWD_PATH}" "${BASIC_AUTH_USER}" "${BASIC_AUTH_PASSWORD}"
-      echo "Created fresh .htpasswd for prod restore."
+      #prompt_basic_auth_credentials "${PROJECT_NAME}"
+      # write_basic_auth_file "${HTPASSWD_PATH}" "${BASIC_AUTH_USER}" "${BASIC_AUTH_PASSWORD}"
+      #echo "Created fresh .htpasswd for prod restore."
+      echo "IMPORTANT: YOU NEED TO CREATE a fresh .htpasswd for prod restore."
     fi
   fi
 fi
@@ -488,5 +489,17 @@ echo "Fixing ownership inside container..."
 echo "Restarting WordPress service..."
 "${COMPOSE[@]}" restart "${WP_SERVICE}"
 
+echo "Normalizing bind-mounted runtime permissions..."
+"${SCRIPT_DIR}/mod-file-access.sh" "${MODE}" "${PROJECT_NAME}"
+
 echo "Restore complete: ${PROJECT_NAME}"
 echo "URL: ${SITE_URL}"
+
+if [[ "${MODE}" == "prod" && "${HAS_BASIC_AUTH}" == "true" ]]; then
+  echo
+  echo "Notice:"
+  echo "  Archive metadata says this site used Basic Auth."
+  echo "  Basic Auth was not recreated automatically during restore."
+  echo "  Run this next if needed:"
+  echo "    ./docker/scripts/set-basic-auth.sh prod ${PROJECT_NAME} <username>"
+fi

@@ -7,25 +7,21 @@ Usage:
   ./docker/scripts/delete-project.sh <dev|prod> <project_name> [--yes] [--no-export]
 
 What it does:
-  - optionally exports the live WordPress site back into data/<project> first
+  - optionally exports the live runtime back into data/<project> first
+  - normalizes bind-mounted runtime permissions before delete
   - runs docker compose down -v ONLY for docker/sites/<project>/compose.yaml
+  - deletes bind-mounted runtime directories for that project
   - sets active=false in data/world-list.json
   - comments out the matching include block in docker/compose.yaml
-  - deletes bind-mounted runtime directories for that project
 
 What it does NOT delete:
   - data/<project>
   - docker/sites/<project>
   - env entries in docker/.env.dev or docker/.env.prod
 
-Notes:
-  - This is a project data purge + deactivate, not a project definition delete.
-  - For wordpress projects, you can refresh the archive before deletion.
-  - For fullstack projects, automatic Django export is not implemented here.
-
 Options:
   --yes        skip confirmation prompt
-  --no-export  do not offer/export WordPress runtime before deletion
+  --no-export  do not offer/export runtime before deletion
 EOF
 }
 
@@ -133,20 +129,11 @@ append_delete_path_if_bind() {
   DELETE_PATHS+=("${host_path}")
 }
 
-offer_wordpress_export() {
-  if [[ "${NO_EXPORT}" == "true" ]]; then
-    return 0
-  fi
+offer_project_export() {
+  local answer=""
+  local export_cmd=()
 
-  if [[ "${PROJECT_TYPE}" != "wordpress" ]]; then
-    if [[ "${PROJECT_TYPE}" == "fullstack" ]]; then
-      echo
-      echo "Warning:"
-      echo "  ${PROJECT_NAME} is a fullstack project."
-      echo "  Automatic Django export/update back to data/ is not implemented here."
-      echo "  WordPress-only export-site.sh is not enough for fullstack backup."
-      echo
-    fi
+  if [[ "${NO_EXPORT}" == "true" ]]; then
     return 0
   fi
 
@@ -154,12 +141,24 @@ offer_wordpress_export() {
     return 0
   fi
 
+  case "${PROJECT_TYPE}" in
+    wordpress)
+      export_cmd=("${SCRIPT_DIR}/export-site.sh" "${MODE}" "${PROJECT_NAME}")
+      ;;
+    fullstack)
+      export_cmd=("${SCRIPT_DIR}/export-fullstack.sh" "${MODE}" "${PROJECT_NAME}")
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+
   echo
-  read -r -p "Export live WordPress runtime back into data/${PROJECT_NAME} before delete? [y/N] " answer
+  read -r -p "Export live runtime back into data/${PROJECT_NAME} before delete? [y/N] " answer
 
   case "${answer}" in
     y|Y|yes|YES)
-      "${SCRIPT_DIR}/export-site.sh" "${MODE}" "${PROJECT_NAME}"
+      "${export_cmd[@]}"
       ;;
     *)
       ;;
@@ -178,19 +177,21 @@ confirm_delete() {
   echo "Mode: ${MODE}"
   echo
   echo "This will:"
+  echo "  - export runtime first only if you explicitly choose it"
+  echo "  - normalize bind-mounted permissions before delete"
   echo "  - docker compose down -v for docker/sites/${PROJECT_NAME}/compose.yaml"
-  echo "  - set active=false in data/world-list.json"
-  echo "  - comment out the include in docker/compose.yaml"
+  echo "  - delete bind-mounted runtime path(s)"
 
   if [[ "${#DELETE_PATHS[@]}" -gt 0 ]]; then
-    echo "  - delete bind-mounted runtime path(s):"
     for path in "${DELETE_PATHS[@]}"; do
       echo "      ${path}"
     done
   else
-    echo "  - no bind-mounted runtime paths detected for deletion"
+    echo "      [none detected]"
   fi
 
+  echo "  - set active=false in data/world-list.json"
+  echo "  - comment out the include in docker/compose.yaml"
   echo
   echo "This will NOT delete:"
   echo "  - ${REPO_ROOT}/data/${PROJECT_NAME}"
@@ -205,19 +206,46 @@ confirm_delete() {
   fi
 }
 
+normalize_bind_access_before_delete() {
+  if [[ "${#DELETE_PATHS[@]}" -eq 0 ]]; then
+    return 0
+  fi
+
+  echo "Normalizing bind-mounted runtime permissions before delete..."
+  "${SCRIPT_DIR}/mod-file-access.sh" "${MODE}" "${PROJECT_NAME}"
+}
+
 down_project() {
   if [[ ! -f "${PROJECT_COMPOSE_FILE}" ]]; then
     echo "Missing project compose file: ${PROJECT_COMPOSE_FILE}"
     exit 1
   fi
 
-  echo "Stopping and removing containers/volumes for ${PROJECT_NAME}..."
+  echo "Stopping and removing only ${PROJECT_NAME} containers/volumes..."
 
   docker compose \
     --env-file "${ENV_FILE}" \
     --project-directory "${DOCKER_DIR}" \
     -f "${PROJECT_COMPOSE_FILE}" \
-    down -v --remove-orphans
+    down -v
+}
+
+delete_runtime_paths() {
+  local path=""
+
+  if [[ "${#DELETE_PATHS[@]}" -eq 0 ]]; then
+    echo "No bind-mounted runtime paths to delete."
+    return 0
+  fi
+
+  for path in "${DELETE_PATHS[@]}"; do
+    if [[ -e "${path}" ]]; then
+      rm -rf "${path}"
+      echo "Deleted runtime path: ${path}"
+    else
+      echo "Runtime path not found, skipped: ${path}"
+    fi
+  done
 }
 
 mark_project_inactive() {
@@ -302,24 +330,6 @@ if changed:
 else:
     print(f"No uncommented include block found for {project_name} in {compose_path}")
 PY
-}
-
-delete_runtime_paths() {
-  local path=""
-
-  if [[ "${#DELETE_PATHS[@]}" -eq 0 ]]; then
-    echo "No bind-mounted runtime paths to delete."
-    return 0
-  fi
-
-  for path in "${DELETE_PATHS[@]}"; do
-    if [[ -e "${path}" ]]; then
-      rm -rf "${path}"
-      echo "Deleted runtime path: ${path}"
-    else
-      echo "Runtime path not found, skipped: ${path}"
-    fi
-  done
 }
 
 MODE="${1:-}"
@@ -424,12 +434,13 @@ DELETE_PATHS=()
 append_delete_path_if_bind "${WP_FILES_MOUNT_VALUE}"
 append_delete_path_if_bind "${DJANGO_CODE_MOUNT_VALUE}"
 
-offer_wordpress_export
+offer_project_export
 confirm_delete
+normalize_bind_access_before_delete
 down_project
+delete_runtime_paths
 mark_project_inactive
 comment_root_include
-delete_runtime_paths
 
 echo
 echo "Delete complete for ${PROJECT_NAME}"

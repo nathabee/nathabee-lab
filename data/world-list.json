@@ -49,6 +49,7 @@
         "wp_files_mount": "DEMOFS_WP_FILES_MOUNT",
         "django_port": "DEMOFS_DJANGO_PORT",
         "django_code_mount": "DEMOFS_DJANGO_CODE_MOUNT",
+        "django_env_file": "DEMOFS_DJANGO_ENV_FILE",
         "django_db_name": "DEMOFS_DJANGO_DB_NAME",
         "django_db_user": "DEMOFS_DJANGO_DB_USER",
         "django_db_password": "DEMOFS_DJANGO_DB_PASSWORD",

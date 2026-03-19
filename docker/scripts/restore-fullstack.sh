@@ -273,8 +273,13 @@ fi
 echo "Starting Django service..."
 "${COMPOSE[@]}" up -d "${DJANGO_SERVICE}"
 
+echo "Normalizing bind-mounted runtime permissions..."
+"${SCRIPT_DIR}/mod-file-access.sh" "${MODE}" "${PROJECT_NAME}"
+
 echo
 echo "Fullstack restore complete: ${PROJECT_NAME}"
+
+echo 
 echo "WordPress restored."
 echo "Django code restored from data/${PROJECT_NAME}/django."
 echo "Django database restored from ${DJANGO_SQL_GZ}."
