@@ -5,36 +5,19 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 DATA_DIR="${PROJECT_ROOT}/data"
+WORLD_FILE="${DATA_DIR}/world-list.json"
 BUILD_DIR="${PROJECT_ROOT}/build/releases"
-
-ALLOWED_ENVS=("demo_fullstack" "orthopedagogie" "demo_fullstack")
 
 usage() {
   cat <<EOF
 Usage:
-  $(basename "$0") [--local-only] [--stamp YYYYMMDD-HHMMSS] <environment>
-
-Allowed environments:
-  ${ALLOWED_ENVS[*]}
+  $(basename "$0") [--local-only] [--stamp YYYYMMDD-HHMMSS] <project>
 
 Examples:
-  $(basename "$0") orthopedagogie
+  $(basename "$0") demo_wordpress
   $(basename "$0") --local-only demo_fullstack
   $(basename "$0") --stamp 20260315-101530 demo_fullstack
 EOF
-}
-
-is_allowed_env() {
-  local candidate="$1"
-  local allowed
-
-  for allowed in "${ALLOWED_ENVS[@]}"; do
-    if [[ "${allowed}" == "${candidate}" ]]; then
-      return 0
-    fi
-  done
-
-  return 1
 }
 
 require_cmd() {
@@ -48,7 +31,7 @@ require_cmd() {
 
 LOCAL_ONLY=0
 STAMP=""
-ENV_NAME=""
+PROJECT_NAME=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -69,26 +52,45 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
-      if [[ -n "${ENV_NAME}" ]]; then
-        echo "Error: only one environment can be released at a time" >&2
+      if [[ -n "${PROJECT_NAME}" ]]; then
+        echo "Error: only one project can be released at a time" >&2
         usage
         exit 1
       fi
-      ENV_NAME="$1"
+      PROJECT_NAME="$1"
       shift
       ;;
   esac
 done
 
-if [[ -z "${ENV_NAME}" ]]; then
-  echo "Error: missing environment name" >&2
+if [[ -z "${PROJECT_NAME}" ]]; then
+  echo "Error: missing project name" >&2
   usage
   exit 1
 fi
 
-if ! is_allowed_env "${ENV_NAME}"; then
-  echo "Error: unknown environment '${ENV_NAME}'" >&2
-  echo "Allowed values: ${ALLOWED_ENVS[*]}" >&2
+require_cmd git
+require_cmd jq
+
+if [[ ! -f "${WORLD_FILE}" ]]; then
+  echo "Error: missing world list: ${WORLD_FILE}" >&2
+  exit 1
+fi
+
+PROJECT_JSON="$(
+  jq -e --arg name "${PROJECT_NAME}" '
+    (.projects // .)[]
+    | select((.projectname // .name) == $name)
+  ' "${WORLD_FILE}"
+)" || {
+  echo "Error: project not found in ${WORLD_FILE}: ${PROJECT_NAME}" >&2
+  exit 1
+}
+
+PROJECT_TYPE="$(printf '%s\n' "${PROJECT_JSON}" | jq -r '.projecttype // .type // empty')"
+
+if [[ "${PROJECT_TYPE}" != "wordpress" && "${PROJECT_TYPE}" != "fullstack" ]]; then
+  echo "Error: unsupported project type for ${PROJECT_NAME}: ${PROJECT_TYPE}" >&2
   exit 1
 fi
 
@@ -96,31 +98,64 @@ if [[ -z "${STAMP}" ]]; then
   STAMP="$(date +%Y%m%d-%H%M%S)"
 fi
 
-TAG="data-${ENV_NAME}-${STAMP}"
+TAG="data-${PROJECT_NAME}-${STAMP}"
 ARCHIVE_NAME="${TAG}.tar.gz"
 ARCHIVE_PATH="${BUILD_DIR}/${ARCHIVE_NAME}"
-ENV_DIR="${DATA_DIR}/${ENV_NAME}"
+PROJECT_DATA_DIR="${DATA_DIR}/${PROJECT_NAME}"
+CONFIG_JSON="${PROJECT_DATA_DIR}/updateArchive.json"
 
-require_cmd git
-
-if [[ ! -d "${ENV_DIR}" ]]; then
-  echo "Error: missing data directory: ${ENV_DIR}" >&2
+if [[ ! -d "${PROJECT_DATA_DIR}" ]]; then
+  echo "Error: missing data directory: ${PROJECT_DATA_DIR}" >&2
   exit 1
 fi
 
-if [[ ! -d "${ENV_DIR}/database" ]]; then
-  echo "Error: missing database directory: ${ENV_DIR}/database" >&2
+if [[ ! -f "${CONFIG_JSON}" ]]; then
+  echo "Error: missing file: ${CONFIG_JSON}" >&2
+  echo "Run the appropriate export first." >&2
   exit 1
 fi
 
-if [[ ! -d "${ENV_DIR}/wpfile" ]]; then
-  echo "Error: missing wpfile directory: ${ENV_DIR}/wpfile" >&2
+if [[ ! -d "${PROJECT_DATA_DIR}/database" ]]; then
+  echo "Error: missing database directory: ${PROJECT_DATA_DIR}/database" >&2
   exit 1
 fi
 
-if [[ ! -f "${ENV_DIR}/updateArchive.json" ]]; then
-  echo "Error: missing file: ${ENV_DIR}/updateArchive.json" >&2
+if [[ ! -d "${PROJECT_DATA_DIR}/wpfile" ]]; then
+  echo "Error: missing wpfile directory: ${PROJECT_DATA_DIR}/wpfile" >&2
   exit 1
+fi
+
+WP_DUMP_REL="$(jq -r '.database_dump // empty' "${CONFIG_JSON}")"
+if [[ -z "${WP_DUMP_REL}" ]]; then
+  echo "Error: updateArchive.json is missing .database_dump" >&2
+  exit 1
+fi
+
+WP_DUMP_PATH="${PROJECT_DATA_DIR}/${WP_DUMP_REL}"
+if [[ ! -f "${WP_DUMP_PATH}" ]]; then
+  echo "Error: missing WordPress DB dump: ${WP_DUMP_PATH}" >&2
+  exit 1
+fi
+
+if [[ "${PROJECT_TYPE}" == "fullstack" ]]; then
+  if [[ ! -d "${PROJECT_DATA_DIR}/django" ]]; then
+    echo "Error: missing django directory: ${PROJECT_DATA_DIR}/django" >&2
+    echo "Run ./docker/scripts/export-fullstack.sh first." >&2
+    exit 1
+  fi
+
+  DJANGO_DUMP_REL="$(jq -r '.django_database_dump // empty' "${CONFIG_JSON}")"
+  if [[ -z "${DJANGO_DUMP_REL}" ]]; then
+    echo "Error: updateArchive.json is missing .django_database_dump for fullstack project" >&2
+    echo "Run ./docker/scripts/export-fullstack.sh first." >&2
+    exit 1
+  fi
+
+  DJANGO_DUMP_PATH="${PROJECT_DATA_DIR}/${DJANGO_DUMP_REL}"
+  if [[ ! -f "${DJANGO_DUMP_PATH}" ]]; then
+    echo "Error: missing Django DB dump: ${DJANGO_DUMP_PATH}" >&2
+    exit 1
+  fi
 fi
 
 if ! git -C "${PROJECT_ROOT}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -151,7 +186,7 @@ mkdir -p "${BUILD_DIR}"
 rm -f "${ARCHIVE_PATH}"
 
 echo "Creating archive: ${ARCHIVE_PATH}"
-tar -C "${DATA_DIR}" -czf "${ARCHIVE_PATH}" "${ENV_NAME}"
+tar -C "${DATA_DIR}" -czf "${ARCHIVE_PATH}" "${PROJECT_NAME}"
 
 HEAD_COMMIT="$(git -C "${PROJECT_ROOT}" rev-parse HEAD)"
 
@@ -164,7 +199,7 @@ if git -C "${PROJECT_ROOT}" rev-parse -q --verify "refs/tags/${TAG}" >/dev/null 
   echo "Reusing existing local tag: ${TAG}"
 else
   echo "Creating local tag: ${TAG}"
-  git -C "${PROJECT_ROOT}" tag -a "${TAG}" -m "Data release for ${ENV_NAME} (${STAMP})"
+  git -C "${PROJECT_ROOT}" tag -a "${TAG}" -m "Data release for ${PROJECT_NAME} (${STAMP})"
 fi
 
 if [[ "${LOCAL_ONLY}" -eq 1 ]]; then
@@ -191,11 +226,13 @@ else
     cd "${PROJECT_ROOT}" && \
     gh release create "${TAG}" "${ARCHIVE_PATH}" \
       --title "${TAG}" \
-      --notes "Data release for ${ENV_NAME} generated on ${STAMP}."
+      --notes "Data release for ${PROJECT_NAME} generated on ${STAMP}."
   )
 fi
 
 echo
 echo "Release complete."
+echo "Project: ${PROJECT_NAME}"
+echo "Type:    ${PROJECT_TYPE}"
 echo "Archive: ${ARCHIVE_PATH}"
 echo "Tag:     ${TAG}"

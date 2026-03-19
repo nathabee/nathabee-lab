@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MODE="${1:-dev}"
+MODE="${1:-}"
 
 if [[ "${MODE}" != "dev" && "${MODE}" != "prod" ]]; then
   echo "Usage: $0 <dev|prod>"
@@ -23,27 +23,34 @@ if [[ ! -f "${WORLD_FILE}" ]]; then
   exit 1
 fi
 
-mapfile -t SITES < <(
+mapfile -t PROJECT_LINES < <(
   jq -r '
     (.projects // .)[]
     | select((.active // false) == true)
-    | select((.projecttype // .type // "") == "wordpress")
-    | (.projectname // .name // empty)
+    | select((.projecttype // .type // "") == "wordpress" or (.projecttype // .type // "") == "fullstack")
+    | "\((.projectname // .name))|\((.projecttype // .type))"
   ' "${WORLD_FILE}"
 )
 
-if [[ "${#SITES[@]}" -eq 0 ]]; then
-  echo "No active wordpress projects found in ${WORLD_FILE}"
+if [[ "${#PROJECT_LINES[@]}" -eq 0 ]]; then
+  echo "No active wordpress/fullstack projects found in ${WORLD_FILE}"
   exit 1
 fi
 
-for SITE in "${SITES[@]}"; do
+for LINE in "${PROJECT_LINES[@]}"; do
+  IFS='|' read -r PROJECT_NAME PROJECT_TYPE <<< "${LINE}"
+
   echo
   echo "============================================================"
-  echo "Restoring ${SITE}"
+  echo "Restoring ${PROJECT_NAME} (${PROJECT_TYPE})"
   echo "============================================================"
-  "${SCRIPT_DIR}/restore-site.sh" "${MODE}" "${SITE}"
+
+  if [[ "${PROJECT_TYPE}" == "fullstack" ]]; then
+    "${SCRIPT_DIR}/restore-fullstack.sh" "${MODE}" "${PROJECT_NAME}"
+  else
+    "${SCRIPT_DIR}/restore-site.sh" "${MODE}" "${PROJECT_NAME}"
+  fi
 done
 
 echo
-echo "All WordPress site restores completed."
+echo "All restores completed."

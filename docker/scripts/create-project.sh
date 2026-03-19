@@ -289,6 +289,8 @@ services:
     depends_on:
       ${DJANGO_DB_SERVICE}:
         condition: service_healthy
+    env_file:
+      - \${${DJANGO_ENV_FILE_KEY}}
     ports:
       - "127.0.0.1:\${${DJANGO_PORT_KEY}}:8000"
     working_dir: /django
@@ -387,6 +389,7 @@ build_fullstack_project_json() {
     --arg wp_files_mount_key "${WP_FILES_MOUNT_KEY}" \
     --arg django_port_key "${DJANGO_PORT_KEY}" \
     --arg django_code_mount_key "${DJANGO_CODE_MOUNT_KEY}" \
+    --arg django_env_file_key "${DJANGO_ENV_FILE_KEY}" \
     --arg django_db_name_key "${DJANGO_DB_NAME_KEY}" \
     --arg django_db_user_key "${DJANGO_DB_USER_KEY}" \
     --arg django_db_password_key "${DJANGO_DB_PASSWORD_KEY}" \
@@ -418,6 +421,7 @@ build_fullstack_project_json() {
         wp_files_mount: $wp_files_mount_key,
         django_port: $django_port_key,
         django_code_mount: $django_code_mount_key,
+        django_env_file: $django_env_file_key,
         django_db_name: $django_db_name_key,
         django_db_user: $django_db_user_key,
         django_db_password: $django_db_password_key,
@@ -689,6 +693,7 @@ else
   DJANGO_DB_USER_KEY="${CODE}_DJANGO_DB_USER"
   DJANGO_DB_PASSWORD_KEY="${CODE}_DJANGO_DB_PASSWORD"
   DJANGO_CODE_MOUNT_KEY="${CODE}_DJANGO_CODE_MOUNT"
+  DJANGO_ENV_FILE_KEY="${CODE}_DJANGO_ENV_FILE"
   DJANGO_SETTINGS_MODULE_KEY="${CODE}_DJANGO_SETTINGS_MODULE"
   DJANGO_SECRET_KEY_KEY="${CODE}_DJANGO_SECRET_KEY"
 
@@ -706,6 +711,8 @@ else
 
   DEV_DJANGO_DB_PASSWORD="change_me_dev_${NAME}_django_db_password"
   PROD_DJANGO_DB_PASSWORD="change_me_prod_${NAME}_django_db_password"
+  DEV_DJANGO_ENV_FILE="${DJANGO_BIND_PATH}/.env.dev"
+  PROD_DJANGO_ENV_FILE="${DJANGO_BIND_PATH}/.env.prod"
   DEV_DJANGO_SETTINGS_MODULE="config.settings"
   PROD_DJANGO_SETTINGS_MODULE="config.settings"
   DEV_DJANGO_SECRET_KEY="change_me_dev_${NAME}_django_secret"
@@ -796,6 +803,7 @@ ${DB_ROOT_PASSWORD_KEY}=${DEV_DB_ROOT_PASSWORD}
 ${WP_FILES_MOUNT_KEY}=${DEV_WP_MOUNT}
 ${DJANGO_PORT_KEY}=${DJANGO_DEV_PORT}
 ${DJANGO_CODE_MOUNT_KEY}=${DEV_DJANGO_CODE_MOUNT}
+${DJANGO_ENV_FILE_KEY}=${DEV_DJANGO_ENV_FILE}
 ${DJANGO_DB_NAME_KEY}=${DJANGO_DB_NAME}
 ${DJANGO_DB_USER_KEY}=${DJANGO_DB_USER}
 ${DJANGO_DB_PASSWORD_KEY}=${DEV_DJANGO_DB_PASSWORD}
@@ -814,6 +822,7 @@ ${DB_ROOT_PASSWORD_KEY}=${PROD_DB_ROOT_PASSWORD}
 ${WP_FILES_MOUNT_KEY}=${PROD_WP_MOUNT}
 ${DJANGO_PORT_KEY}=${DJANGO_PROD_PORT}
 ${DJANGO_CODE_MOUNT_KEY}=${PROD_DJANGO_CODE_MOUNT}
+${DJANGO_ENV_FILE_KEY}=${PROD_DJANGO_ENV_FILE}
 ${DJANGO_DB_NAME_KEY}=${DJANGO_DB_NAME}
 ${DJANGO_DB_USER_KEY}=${DJANGO_DB_USER}
 ${DJANGO_DB_PASSWORD_KEY}=${PROD_DJANGO_DB_PASSWORD}

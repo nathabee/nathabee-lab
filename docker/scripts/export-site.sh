@@ -85,8 +85,8 @@ if [[ "${ACTIVE}" != "true" ]]; then
   exit 1
 fi
 
-if [[ "${PROJECT_TYPE}" != "wordpress" ]]; then
-  echo "Project ${SITE} is not a wordpress project."
+if [[ "${PROJECT_TYPE}" != "wordpress" && "${PROJECT_TYPE}" != "fullstack" ]]; then
+  echo "Project ${SITE} is not a wordpress/fullstack project."
   exit 1
 fi
 
