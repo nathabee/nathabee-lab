@@ -1,30 +1,70 @@
 # nathabee-lab
 
-Public lab repository for generic WordPress and fullstack Docker workflows.
+Public lab repository for generic Docker workflows around WordPress and WordPress + Django projects.
 
-This repository contains code, scripts, and documentation used to:
+This repository is the script and documentation layer for:
 
-- create and manage Docker-based WordPress projects
-- restore project data from GitHub release assets
-- export project data from running environments
-- package project data as GitHub release assets
-- support migration from legacy host installs to Docker
-- provide public demo examples such as `demo-wordpress` and `demo-fullstack`
+- creating Docker-based projects
+- bootstrapping WordPress and Django runtimes
+- exporting live runtime data back into `data/`
+- packaging project archives as release assets
+- fetching release archives back into local working data
+- restoring projects into Docker environments
+- keeping project definitions generic and project-aware
 
-## Current status
+The active direction of the repository is Docker-native workflow. Legacy host-mode scripts still exist for older environments, but they are no longer the main path.
 
-The project is in transition from a private migration setup to a public generic lab.
+---
 
-At the moment:
+## What this repository manages
 
-- legacy host export support still exists
-- Docker-based restore workflows are supported
-- Docker-based archive export is supported
-- archive data is not meant to live in Git history
-- archive data is intended to be transported through GitHub release assets
-- project inventory is described in `data/world-list.json`
-- code and docs stay generic
-- release examples may contain demo content, but are not source of truth for the repository code
+`nathabee-lab` is built around one central idea:
+
+- runtime data lives in Docker
+- archive data lives in `data/<project>/`
+- release packages are built from `data/<project>/`
+- project definitions are driven by metadata instead of hardcoded project names
+
+The repository supports two project types:
+
+- `wordpress`
+- `fullstack`
+
+A fullstack project means:
+
+- WordPress
+- Django application code
+- Django database export / restore
+
+---
+
+## Current capabilities
+
+The repository currently supports:
+
+- project registration with per-project Compose generation
+- WordPress bootstrap
+- Django bootstrap
+- Docker stack start / stop
+- export of WordPress-only projects
+- export of fullstack projects
+- restore of WordPress-only projects
+- restore of fullstack projects
+- project deletion / deactivation
+- project reactivation
+- release packaging from local archive data
+- release fetching back into local archive data
+
+Status at a glance:
+
+- core Docker workflow exists
+- project creation is usable
+- WordPress bootstrap is usable
+- Django bootstrap is usable
+- export / restore flows exist for both WordPress and fullstack projects
+- some multi-project and fullstack scenarios still need more real-world validation
+
+---
 
 ## Repository structure
 
@@ -32,302 +72,446 @@ At the moment:
 .
 ├── README.md
 ├── TODO.md
-├── .gitignore
+├── build/
+│   └── releases/
 ├── data/
-│   ├── world-list.json
-│   └── .gitkeep
+│   ├── <project>/
+│   │   ├── database/
+│   │   ├── django/            # fullstack only
+│   │   ├── updateArchive.json
+│   │   └── wpfile/
+│   └── world-list.json
+├── docker/
+│   ├── compose.yaml
+│   ├── env.dev.example
+│   ├── env.prod.example
+│   ├── README.md
+│   ├── runtime/
+│   ├── scripts/
+│   └── sites/
+│       └── <project>/
+│           └── compose.yaml
 ├── docs/
 │   ├── archive-data-from-docker.md
 │   ├── archive-data-from-host.md
 │   ├── archive-data.md
-│   ├── docker-cmd.md
+│   ├── create-new-wordpress-project.md
+│   ├── operating-manual.md
 │   ├── password-dev.md
 │   ├── prerequise.md
 │   ├── restore-apache.md
 │   ├── restore-docker-dev.md
 │   └── restore-docker-prod.md
-├── scripts/ 
-│   ├── fetch-release.sh 
-│   ├── release-all.sh
-│   ├── release-project.sh  
-│   ├── restoreArchive.sh
-│   ├── updateAllArchive.sh
-│   └── updateArchive.sh
-└── docker/
-    ├── README.md
-    ├── compose.yaml
-    ├── env.dev.example
-    ├── env.prod.example
-    ├── runtime/
-    ├── sites/
-    │   └── <project>/
-    │       └── compose.yaml
-    └── scripts/
-        ├── alias.sh
-        ├── down.sh
-        ├── export-all.sh
-        ├── export-site.sh
-        ├── fix-urls.sh
-        ├── reset-admin-password.sh
-        ├── restore-all.sh
-        ├── restore-site.sh
-        └── up.sh
-````
+└── scripts/
+    ├── fetch-release.sh
+    ├── release-all.sh
+    ├── release-project.sh 
+```
 
-## Directory roles
+---
 
-### `data/`
+## Core concepts
 
-Local working directory for generated project data such as:
+### 1. Project inventory
 
-* database dumps
-* exported WordPress files
-* archive metadata
+The repository uses `data/world-list.json` as project inventory.
 
-This directory also contains `world-list.json`, which describes the known projects handled by the Docker scripts.
-
-Generated project data should not be committed to Git.
-
-### `data/world-list.json`
-
-Project inventory used by the Docker project-aware scripts.
-
-This file describes:
+That file is the central metadata source for project-aware scripts. It describes things such as:
 
 * project name
 * project type
-* whether the project is active
+* active / inactive status
 * storage mode
-* Docker service names
-* env variable names used by the scripts
+* service naming
+* generated environment variable prefixes
 
-The goal is to avoid hardcoding project names in the Docker management scripts.
+The goal is to keep automation generic and avoid hardcoding project-specific behavior into the scripts.
 
-### `scripts/`
+### 2. Runtime, archive, and release are different things
 
-Host-oriented archive and release tooling.
+There are three distinct layers:
 
-These scripts are used for:
+#### Runtime
 
-* legacy host-based archive export
-* release packaging
-* release fetching
-* legacy host restore helpers
+Live files and databases used by Docker containers.
 
-### `docker/`
+Examples:
 
-Docker stack and Docker-specific tooling used for:
+* `docker/runtime/<project>/` for bind-mounted WordPress
+* `docker/runtime/<project>_django/` for Django runtime
+* Docker named volumes for volume-based WordPress storage
+* container databases
 
-* Docker startup and shutdown
-* Docker archive export
-* Docker archive restore
-* WordPress management inside Docker
+#### Archive
 
-### `docker/sites/`
+Portable project data stored in `data/<project>/`.
 
-Per-project Docker Compose files.
+This is the canonical export / restore format used by the repository.
 
-Each project has its own Compose file under:
+#### Release package
+
+A tarball built from `data/<project>/` and stored under `build/releases/` before publication or transport.
+
+The correct lifecycle is:
+
+1. export runtime into `data/`
+2. package `data/` as a release artifact
+3. fetch / unpack when needed
+4. restore from `data/` back into Docker
+
+### 3. Storage modes for WordPress
+
+WordPress projects can use either:
+
+* `bind`
+* `volume`
+
+#### Bind mode
+
+WordPress files are stored in a host directory such as:
 
 ```text
-docker/sites/<project>/compose.yaml
+docker/runtime/<project>/
 ```
 
-The root `docker/compose.yaml` includes those project files.
+This is convenient for development and direct inspection.
 
-### `docs/`
+#### Volume mode
 
-Project documentation for:
+WordPress files are stored in a Docker-managed named volume.
 
-* archive workflow
-* host export workflow
-* Docker export workflow
-* Docker restore workflows
-* Apache migration notes
+This is cleaner from the host filesystem point of view and still exports to the same archive format.
 
-## Docker architecture
+Important: storage mode affects runtime implementation, but it must not change the archive structure in `data/<project>/`.
 
-The Docker stack is split into:
+### 4. Fullstack model
 
-* one root Compose file: `docker/compose.yaml`
-* one Compose file per project: `docker/sites/<project>/compose.yaml`
+A fullstack project extends the WordPress archive model with Django code and Django database export.
 
-This keeps each project isolated and prepares the repository for cleaner future project creation.
-
-Typical commands:
-
-```bash
-docker compose --env-file docker/.env.dev -f docker/compose.yaml config
-docker compose --env-file docker/.env.dev -f docker/compose.yaml up -d
-```
-
-## Storage model
-
-Docker WordPress projects may use different file storage modes at the same time.
-
-Supported modes are:
-
-* bind mounts
-* named Docker volumes
-
-The Docker export and restore scripts are designed to work with both modes, as long as:
-
-* the `wp_*` service and matching `wpcli_*` service mount the same `/var/www/html`
-* the project metadata in `world-list.json` matches the Compose service names
-
-## Environment files
-
-Example environment files are provided here:
-
-* `docker/env.dev.example`
-* `docker/env.prod.example`
-
-Typical setup:
-
-```bash
-cp docker/env.dev.example docker/.env.dev
-cp docker/env.prod.example docker/.env.prod
-chmod 600 docker/.env.dev docker/.env.prod
-```
-
-The environment files define values such as:
-
-* ports
-* site URLs
-* database names and credentials
-* image names
-* WordPress file mount definitions
-
-## Archive format
-
-Both host-based export and Docker-based export should produce the same archive structure:
+Expected fullstack archive shape:
 
 ```text
 data/<project>/
 ├── database/
-│   └── <project>.sql.gz
-├── wpfile/
-└── updateArchive.json
+│   ├── <project>.sql.gz
+│   └── <project>_django.sql.gz
+├── django/
+├── updateArchive.json
+└── wpfile/
 ```
 
-Notes:
+---
 
-* `wp-config.php` is intentionally excluded
-* `.htpasswd` is intentionally excluded
-* `updateArchive.json` stores export metadata such as table prefix, original URLs, and Basic Auth detection
+## Important directories
 
-## Workflow overview
+### `data/`
 
-The project supports two export sources and one common release transport layer.
+Local working directory for project archive data.
 
-### 1. Export from host-based WordPress
+It contains:
 
-Used for legacy environments that still run directly on Apache and `/var/www/html/...`.
+* WordPress files
+* database dumps
+* Django code snapshots for fullstack projects
+* archive metadata
+* project inventory in `world-list.json`
 
-Typical commands:
+Generated project data should stay out of Git history.
+
+### `docker/`
+
+Docker stack, generated project Compose includes, runtime directories, and Docker-oriented helper scripts.
+
+### `docker/sites/<project>/compose.yaml`
+
+Per-project Compose definition generated by project creation.
+
+The root `docker/compose.yaml` includes these project files.
+
+### `docker/runtime/`
+
+Local runtime tree used for bind-mounted projects and Django runtime staging.
+
+This is runtime state, not source of truth.
+
+### `scripts/`
+
+Repository-level release and fetch tooling.
+
+This is where release packaging and release retrieval live.
+
+
+---
+
+## Main scripts
+
+### Project creation and bootstrap
 
 ```bash
-./scripts/updateArchive.sh <project>
-./scripts/updateAllArchive.sh
+./docker/scripts/create-project.sh
+./docker/scripts/bootstrap-wordpress.sh
+./docker/scripts/bootstrap-django.sh
 ```
 
-### 2. Export from Docker-based WordPress
-
-Used when WordPress sites run in Docker.
-
-Typical commands:
+### Docker lifecycle
 
 ```bash
-./docker/scripts/export-site.sh dev <project>
-./docker/scripts/export-all.sh dev
+./docker/scripts/up.sh
+./docker/scripts/down.sh
+./docker/scripts/activate-project.sh
+./docker/scripts/delete-project.sh
 ```
 
-Or via sourced aliases:
+### Export / archive
 
 ```bash
-source docker/scripts/alias.sh dev
-nwexportsite <project>
+./docker/scripts/export-site.sh
+./docker/scripts/export-fullstack.sh
+./docker/scripts/export-all.sh
 ```
 
-### 3. Package archive data as GitHub release assets
-
-Archive data is packaged from local `data/` and published as GitHub release assets.
-
-Typical commands:
+### Restore
 
 ```bash
-./scripts/release-project.sh <project>
+./docker/scripts/restore-site.sh
+./docker/scripts/restore-fullstack.sh
+./docker/scripts/restore-all.sh
+```
+
+### Release transport
+
+```bash
+./scripts/release-project.sh
 ./scripts/release-all.sh
+./scripts/fetch-release.sh
 ```
 
-### 4. Fetch archive data back from GitHub releases
+---
 
-To restore on another machine, archive data must first be fetched back into local `data/`.
+## Quick start
 
-Typical commands:
-
-```bash
-./scripts/fetch-release.sh --recent-stamps
-./scripts/fetch-release.sh <stamp>
-./scripts/fetch-release.sh <stamp> <project>
-```
-
-### 5. Restore into Docker
-
-Once archive data has been fetched into local `data/`, it can be restored into Docker dev or prod environments.
-
-Typical commands:
-
-```bash
-./docker/scripts/restore-site.sh dev <project>
-./docker/scripts/restore-all.sh dev
-```
-
-## Demo release examples
-
-The repository may ship or document public demo release examples such as:
-
-* `demo-wordpress`
-* `demo-fullstack`
-
-These examples are only example payloads for restore and workflow testing.
-
-They are not source of truth for the repository code or scripts.
-
-## Git commands
-
-### Clone
+Clone the repository:
 
 ```bash
 git clone git@github.com:nathabee/nathabee-lab.git
 cd nathabee-lab
 ```
 
-### Pull
+Create local environment files:
 
 ```bash
-git pull origin main
+cp docker/env.dev.example docker/.env.dev
+cp docker/env.prod.example docker/.env.prod
+chmod 600 docker/.env.dev docker/.env.prod
+chmod +x docker/scripts/*.sh
+chmod +x scripts/*.sh
 ```
 
-### Push
+Validate the Compose configuration:
 
 ```bash
-git add .
-git commit -m "Describe your change"
-git push origin main
+docker compose --env-file docker/.env.dev -f docker/compose.yaml config --services
 ```
 
-## Important notes
+Start the development stack:
 
-* `data/` is local working storage, not tracked source content
-* generated SQL dumps and copied WordPress files should stay out of Git history
-* release archives are the intended transport format for project data
-* host export and Docker export should produce the same archive structure
-* Docker file storage may use either bind mounts or named volumes
-* Docker project-aware scripts use `data/world-list.json` instead of hardcoded project names
-* code and docs remain generic even when release examples contain demo content
+```bash
+./docker/scripts/up.sh dev
+```
 
-## Documentation
+---
 
-See `docs/` and `TODO.md`.
- 
+## Typical workflows
+
+## Create a new project
+
+Register the project structure first, then bootstrap the runtime.
+
+Example:
+
+```bash
+./docker/scripts/create-project.sh \
+  --type wordpress \
+  --name demo_wordpress \
+  --description "Demo WordPress" \
+  --code DEMOWP \
+  --storage bind \
+  --dev-port 8085 \
+  --prod-port 18085 \
+  --dev-url http://localhost:8085/ \
+  --prod-url https://demo-wordpress.example.test/
+```
+
+Then bootstrap WordPress:
+
+```bash
+./docker/scripts/bootstrap-wordpress.sh \
+  dev demo_wordpress \
+  --title "Demo WordPress" \
+  --admin-user beelab \
+  --admin-email you@example.com \
+  --table-prefix demowp_
+```
+
+For fullstack projects, bootstrap Django separately after the project definition and Django code are in place.
+
+## Export a live project back into archive data
+
+WordPress-only:
+
+```bash
+./docker/scripts/export-site.sh dev demo_wordpress
+```
+
+Fullstack:
+
+```bash
+./docker/scripts/export-fullstack.sh dev demo_fullstack
+```
+
+This updates `data/<project>/` from the live Docker runtime.
+
+## Package a release
+
+```bash
+./scripts/release-project.sh demo_fullstack
+```
+
+or:
+
+```bash
+./scripts/release-all.sh
+```
+
+Release packaging always works from `data/<project>/`, not directly from live runtime.
+
+## Fetch and restore a release
+
+Fetch archive data back into local `data/`:
+
+```bash
+./scripts/fetch-release.sh --recent
+```
+
+Then restore it into Docker:
+
+```bash
+./docker/scripts/restore-site.sh dev demo_wordpress
+```
+
+or:
+
+```bash
+./docker/scripts/restore-fullstack.sh dev demo_fullstack
+```
+
+## Delete and later reactivate a project
+
+Delete / deactivate:
+
+```bash
+./docker/scripts/delete-project.sh dev demo_fullstack
+```
+
+Reactivate and restore later:
+
+```bash
+./docker/scripts/activate-project.sh demo_fullstack
+./docker/scripts/restore-fullstack.sh dev demo_fullstack
+```
+
+---
+
+## Archive format
+
+WordPress archive format:
+
+```text
+data/<project>/
+├── database/
+│   └── <project>.sql.gz
+├── updateArchive.json
+└── wpfile/
+```
+
+Fullstack archive format:
+
+```text
+data/<project>/
+├── database/
+│   ├── <project>.sql.gz
+│   └── <project>_django.sql.gz
+├── django/
+├── updateArchive.json
+└── wpfile/
+```
+
+Notes:
+
+* `wp-config.php` should not be treated as portable archive content
+* `.htpasswd` should not be treated as portable archive content
+* `updateArchive.json` stores archive metadata used by export / restore logic
+
+---
+
+## Documentation map
+
+Start here depending on the task:
+
+* `docs/operating-manual.md`
+  Full Docker workflow for create, export, restore, delete, and release packaging
+
+* `docs/create-new-wordpress-project.md`
+  Project creation and bootstrap flow
+
+* `docs/restore-docker-dev.md`
+  Restore into Docker development environment
+
+* `docs/restore-docker-prod.md`
+  Restore into Docker production environment
+
+* `docs/archive-data-from-docker.md`
+  Docker-based export model
+
+* `docs/archive-data-from-host.md`
+  Legacy host-based export model
+
+* `docker/README.md`
+  Docker-specific notes
+
+---
+
+## Current boundaries
+
+This repository is not a generic PaaS and not a full deployment platform.
+
+It is currently a script-driven lab for:
+
+* project-aware Docker management
+* archive export / restore
+* release-based transport of project data
+* repeatable WordPress and Django bootstrap workflows
+
+It is intentionally built around explicit scripts and explicit archive formats.
+
+---
+
+
+## Planned direction
+
+The next logical layer is automation around the existing scripts, not replacement of them.
+
+That means any future orchestration layer should call the repository workflows rather than redefine them.
+
+The source of truth should remain:
+
+* the repository scripts
+* the project inventory
+* the archive format
+* the documentation
+
+
+---
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
