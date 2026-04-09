@@ -9,4 +9,5 @@ docker/runtime/**
 data/**
 !data/.gitkeep
 !data/world-list.json
+#password-dev.md
 
